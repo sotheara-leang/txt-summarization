@@ -5,6 +5,7 @@ import torch.nn.functional as f
 from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
 import math
+import os
 
 from main.data.giga import *
 from main.seq2seq import Seq2Seq
@@ -273,13 +274,17 @@ class Train(object):
     def run(self):
         self.seq2seq.train()
 
-        logger.debug('configuration: \n' + conf.dump().strip())
+        logger.debug('>>> configuration: \n' + conf.dump().strip())
+
+        # load pre-trained model
+        self.load_model()
 
         total_batch_counter = 0
 
         criterion_scheduler = t.optim.lr_scheduler.StepLR(self.optimizer, self.lr_decay_epoch, self.lr_decay)
 
         for i in range(self.epoch):
+
             logger.debug('================= Epoch %i/%i =================', i + 1, self.epoch)
 
             batch_counter       = 0
@@ -342,14 +347,11 @@ class Train(object):
             else:
                 logger.debug('rl-loss_avg\t=\tNA')
 
+            # reload data set
             self.data_loader.reset()
 
         # save model
-        model_path = FileUtil.get_file_path(conf.get('train:save-model-file'))
-
-        logger.debug('save model into : ' + model_path)
-
-        t.save(self.seq2seq.state_dict(), model_path)
+        self.save_model({'epoch': i, 'loss': epoch_loss})
 
     def evaluate(self):
         self.seq2seq.eval()
@@ -361,6 +363,38 @@ class Train(object):
         summary = self.seq2seq.summarize(article)
 
         print(summary)
+
+    def save_model(self, args):
+        model_file = FileUtil.get_file_path(conf.get('train:save-model-file'))
+
+        logger.debug('>>> save model into: ' + model_file)
+
+        t.save({
+            'epoch': args['epoch'],
+            'loss': args['loss'],
+            'model_state_dict': self.seq2seq.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }, FileUtil.get_file_path(model_file))
+
+    def load_model(self):
+        model_file = FileUtil.get_file_path(conf.get('train:save-model-file'))
+
+        if os.path.isfile(model_file):
+            logger.debug('>>> load pre-trained model from: %s', model_file)
+
+            checkpoint = t.load(model_file)
+
+            epoch = checkpoint['epoch']
+            loss = checkpoint['loss']
+
+            self.seq2seq.load_state_dict(checkpoint['model_state_dict'])
+
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+            logger.debug('epoch: %s', str(epoch))
+            logger.debug('loss: %s', str(loss.item()))
+        else:
+            logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
 
 
 if __name__ == "__main__":
