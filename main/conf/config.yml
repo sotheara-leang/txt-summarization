@@ -17,9 +17,9 @@ train:
   log-batch: true
   clip-gradient-max-norm: 1
 
-  lr: 0.0001
+  lr: 0.001
   lr-decay: 0.1
-  lr-decay-epoch: 40
+  lr-decay-epoch: 50
 
   ml:
     enable: true
@@ -36,3 +36,4 @@ train:
   vocab-file: data/extract/giga-vocab.txt
   emb-file: data/extract/embedding
   save-model-file: data/extract/giga-model.ckpt
+  tb-log-dir: logs/tensorboard/

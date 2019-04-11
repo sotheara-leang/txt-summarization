@@ -51,7 +51,7 @@ class Train(object):
 
         self.criterion = nn.NLLLoss(reduction='none', ignore_index=TK_PADDING['id'])
 
-        self.tb_writer = SummaryWriter(FileUtil.get_file_path('logs/tensorboard/'))
+        self.tb_writer = SummaryWriter(FileUtil.get_file_path(conf.get('train:tb-log-dir')))
 
     def train_batch(self, batch, epoch_counter):
         self.optimizer.zero_grad()
@@ -355,6 +355,8 @@ class Train(object):
         self.seq2seq.eval()
 
         article, _ = self.data_loader.next()
+
+        print(article)
 
         summary = self.seq2seq.summarize(article)
 
