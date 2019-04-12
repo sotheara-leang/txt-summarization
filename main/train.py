@@ -284,13 +284,8 @@ class Train(object):
 
         return y, loss
 
-    def run(self):
+    def train(self):
         self.seq2seq.train()
-
-        logger.debug('>>> configuration: \n' + conf.dump().strip())
-
-        # load pre-trained model
-        self.load_model()
 
         logger.debug('>>> training:')
 
@@ -365,11 +360,7 @@ class Train(object):
             # reload data set
             self.data_loader.reset()
 
-        # evaluate
-        self.evaluate()
-
-        # save model
-        self.save_model({'epoch': i, 'loss': epoch_loss})
+        return i, epoch_loss
 
     def evaluate(self):
         is_enable = conf.get('train:eval')
@@ -386,7 +377,7 @@ class Train(object):
         samples = self.data_loader.read_all()
         for sample in samples:
             article = sample[0]
-            ref_summary = sample[0]
+            ref_summary = sample[1]
 
             gen_summary = self.seq2seq.summarize(article)
 
@@ -446,6 +437,22 @@ class Train(object):
             'model_state_dict': self.seq2seq.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
         }, FileUtil.get_file_path(model_file))
+
+    def run(self):
+        # display configuration
+        logger.debug('>>> configuration: \n' + conf.dump().strip())
+
+        # load pre-trained model
+        self.load_model()
+
+        # train
+        epoch, loss = self.train()
+
+        # evaluate
+        self.evaluate()
+
+        # save model
+        self.save_model({'epoch': epoch, 'loss': loss})
 
 
 if __name__ == "__main__":
