@@ -1,7 +1,5 @@
 from rouge import Rouge
-import torch as t
 import torch.nn as nn
-import torch.nn.functional as f
 from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
 import math
@@ -19,6 +17,10 @@ from main.common.glove.embedding import GloveEmbedding
 class Train(object):
 
     def __init__(self):
+        self.hidden_size                = conf.get('hidden-size')
+        self.max_enc_steps              = conf.get('max-enc-steps')
+        self.max_dec_steps              = conf.get('max-dec-steps')
+
         self.epoch                      = conf.get('train:epoch')
         self.batch_size                 = conf.get('train:batch-size')
         self.clip_gradient_max_norm     = conf.get('train:clip-gradient-max-norm')
@@ -36,17 +38,22 @@ class Train(object):
         self.rl_transit_epoch           = conf.get('train:rl:transit-epoch')
         self.rl_transit_decay           = conf.get('train:rl:transit-decay')
 
-        self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('train:vocab-file')), conf.get('vocab-size'))
-        #self.vocab = GloveVocab(FileUtil.get_file_path(conf.get('train:vocab-file')))
+        self.dir                        = conf.get('train:dir')
+        if not self.dir:
+            logger.warning('train directory not defined')
+            return
+
+        self.vocab = SimpleVocab(FileUtil.get_file_path(self.dir + '/' + conf.get('train:vocab-file')), conf.get('vocab-size'))
+        #self.vocab = GloveVocab(FileUtil.get_file_path(self.dir + '/' + conf.get('train:vocab-file')))
 
         self.seq2seq = cuda(Seq2Seq(self.vocab))
 
-        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(conf.get('train:emb-file')))))
+        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(self.dir + '/' + conf.get('train:emb-file')))))
 
-        self.batch_initializer = BatchInitializer(self.vocab, conf.get('max-enc-steps'))
+        self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps)
 
-        self.data_loader = GigaDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
-                                          FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
+        self.data_loader = GigaDataLoader(FileUtil.get_file_path(self.dir + '/' + conf.get('train:article-file')),
+                                          FileUtil.get_file_path(self.dir + '/' + conf.get('train:summary-file')), self.batch_size)
 
         self.optimizer = t.optim.Adam(self.seq2seq.parameters(), lr=self.lr)
 
@@ -66,12 +73,14 @@ class Train(object):
 
         enc_outputs, (enc_hidden, enc_cell) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2H), (B, 2H)
 
+        enc_cell = cuda(t.zeros(self.batch_size, 2 * self.hidden_size))
+
         ## ML
 
         if self.ml_enable:
             output = self.train_ml(enc_outputs, enc_hidden, enc_cell, dec_input, batch, epoch_counter)
 
-            ml_loss = t.sum(output[1], dim=1) / t.sum(output[1] != 0, dim=1).float()
+            ml_loss = t.sum(output[1], dim=1) / batch.summaries_len.float()
             ml_loss = t.mean(ml_loss)
         else:
             ml_loss = cuda(t.zeros(1))
@@ -87,7 +96,7 @@ class Train(object):
 
         if rl_enable:
             # sampling
-            sample_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, dec_input, batch, True)
+            sampling_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, dec_input, batch, True)
 
             # greedy search
             with t.autograd.no_grad():
@@ -95,10 +104,10 @@ class Train(object):
 
             # convert decoded output to string
 
-            sample_summaries = []
-            sample_outputs = sample_output[0].tolist()
-            for idx, summary in enumerate(sample_outputs):
-                sample_summaries.append(' '.join(self.vocab.ids2words(summary, batch.oovs[idx])))
+            sampling_summaries = []
+            sampling_outputs = sampling_output[0].tolist()
+            for idx, summary in enumerate(sampling_outputs):
+                sampling_summaries.append(' '.join(self.vocab.ids2words(summary, batch.oovs[idx])))
 
             baseline_summaries = []
             baseline_outputs = baseline_output[0].tolist()
@@ -109,21 +118,22 @@ class Train(object):
 
             # calculate rouge score
 
-            sample_scores = rouge.get_scores(list(sample_summaries), list(reference_summaries))
-            sample_scores = cuda(t.tensor([score["rouge-l"]["f"] for score in sample_scores]))
+            sampling_scores = rouge.get_scores(list(sampling_summaries), list(reference_summaries))
+            sampling_scores = cuda(t.tensor([score["rouge-l"]["f"] for score in sampling_scores]))
 
             baseline_scores = rouge.get_scores(list(baseline_summaries), list(reference_summaries))
             baseline_scores = cuda(t.tensor([score["rouge-l"]["f"] for score in baseline_scores]))
 
             # loss
 
-            rl_loss = t.sum(sample_output[1], dim=1) / t.sum(sample_output[1] != 0, dim=1).float()
-            rl_loss = (baseline_scores - sample_scores) * rl_loss
+            sampling_loss = t.sum(sampling_output[1], dim=1) / t.sum(sampling_output[1] != 0, dim=1).float()
+
+            rl_loss = (baseline_scores - sampling_scores) * sampling_loss
             rl_loss = t.mean(rl_loss)
 
             # reward
 
-            reward = t.mean(sample_scores - baseline_scores)
+            reward = t.mean(sampling_scores - baseline_scores)
         else:
             rl_loss = cuda(t.zeros(1))
             reward = 0
@@ -152,8 +162,11 @@ class Train(object):
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
         target_y                = batch.summaries
         articles_padding_mask   = batch.articles_padding_mask
+        max_dec_len             = max(batch.summaries_len)
 
-        for i in range(target_y.size(1)):
+        enc_ctx_vector          = cuda(t.zeros(self.batch_size, 2 * self.hidden_size))
+
+        for i in range(max_dec_len):
             ## decoding
             vocab_dist, dec_hidden, dec_cell, _, _, enc_temporal_score = self.seq2seq.decode(
                 dec_input,
@@ -163,12 +176,13 @@ class Train(object):
                 enc_outputs,
                 articles_padding_mask,
                 enc_temporal_score,
+                enc_ctx_vector,
                 extend_vocab_articles,
                 max_ovv_len)
 
             ## loss
 
-            step_loss = self.criterion(t.log(vocab_dist + 1e-31), target_y[:, i])  # B
+            step_loss = self.criterion(t.log(vocab_dist + 1e-12), target_y[:, i])  # B
 
             for v in step_loss:
                 if math.isnan(v) or math.isinf(v):
@@ -216,12 +230,11 @@ class Train(object):
         pre_dec_hiddens         = None  # B, T, 2H
         stop_decoding_mask      = cuda(t.zeros(self.batch_size))
         target_y                = batch.summaries
-        dec_len                 = self.max_dec_steps if target_y is None else target_y.size(1)
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
         articles_padding_mask   = batch.articles_padding_mask
         extend_vocab_articles   = batch.extend_vocab_articles
 
-        for i in range(dec_len):
+        for i in range(self.max_dec_steps):
             ## decoding
             vocab_dist, dec_hidden, dec_cell, _, _, enc_temporal_score = self.seq2seq.decode(
                 dec_input,
@@ -278,6 +291,8 @@ class Train(object):
 
         # load pre-trained model
         self.load_model()
+
+        logger.debug('>>> training:')
 
         total_batch_counter = 0
 
@@ -350,34 +365,45 @@ class Train(object):
             # reload data set
             self.data_loader.reset()
 
+        # evaluate
+        self.evaluate()
+
         # save model
         self.save_model({'epoch': i, 'loss': epoch_loss})
 
     def evaluate(self):
+        is_enable = conf.get('train:eval')
+        if is_enable is False:
+            return
+
+        logger.debug('>>> evaluation:')
+
         self.seq2seq.eval()
 
-        article, _ = self.data_loader.next()
+        rouge = Rouge()
+        scores = []
 
-        print(article)
+        samples = self.data_loader.read_all()
+        for sample in samples:
+            article = sample[0]
+            ref_summary = sample[0]
 
-        summary = self.seq2seq.summarize(article)
+            gen_summary = self.seq2seq.summarize(article)
 
-        print(summary)
+            rouge_score = rouge.get_scores(gen_summary, ref_summary)[0]
 
-    def save_model(self, args):
-        model_file = FileUtil.get_file_path(conf.get('train:save-model-file'))
+            scores.append(rouge_score["rouge-l"]["f"])
 
-        logger.debug('>>> save model into: ' + model_file)
+        avg_score = sum(scores) / len(scores)
 
-        t.save({
-            'epoch': args['epoch'],
-            'loss': args['loss'],
-            'model_state_dict': self.seq2seq.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-        }, FileUtil.get_file_path(model_file))
+        logger.debug('examples: %d', len(samples))
+        logger.debug('avg rouge-l score: %.3f', avg_score)
 
     def load_model(self):
-        model_file = FileUtil.get_file_path(conf.get('train:save-model-file'))
+        model_file = conf.get('train:model-file')
+        if model_file is None:
+            return
+        model_file = FileUtil.get_file_path(self.dir + '/' + model_file)
 
         if os.path.isfile(model_file):
             logger.debug('>>> load pre-trained model from: %s', model_file)
@@ -391,13 +417,37 @@ class Train(object):
 
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-            logger.debug('epoch: %s', str(epoch))
+            logger.debug('epoch: %s', str(epoch + 1))
             logger.debug('loss: %s', str(loss.item()))
         else:
             logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
+
+    def save_model(self, args):
+        output_dir = conf.get('train:output-dir')
+        if not output_dir:
+            logger.warning('output dir is undefined')
+            return
+
+        output_dir = FileUtil.get_file_path(output_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        model_file = conf.get('train:save-model-file')
+        if not model_file:
+            return
+
+        model_file = output_dir + '/' + model_file
+
+        logger.debug('>>> save model into: ' + model_file)
+
+        t.save({
+            'epoch': args['epoch'],
+            'loss': args['loss'],
+            'model_state_dict': self.seq2seq.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }, FileUtil.get_file_path(model_file))
 
 
 if __name__ == "__main__":
     train = Train()
     train.run()
-    train.evaluate()

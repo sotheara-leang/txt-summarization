@@ -12,14 +12,14 @@ model-file: data/extract/giga-model.ckpt
 sharing-decoder-weight: true
 
 train:
-  epoch: 100
+  epoch: 5
   batch-size: 20
   log-batch: true
   clip-gradient-max-norm: 1
 
   lr: 0.001
-  lr-decay: 0.1
-  lr-decay-epoch: 50
+  lr-decay: 0.9
+  lr-decay-epoch: 40
 
   ml:
     enable: true
@@ -31,9 +31,15 @@ train:
     transit-decay: 0
     weight: 0.9984
 
-  article-file: data/extract/giga-article.txt
-  summary-file: data/extract/giga-summary.txt
-  vocab-file: data/extract/giga-vocab.txt
-  emb-file: data/extract/embedding
-  save-model-file: data/extract/giga-model.ckpt
+  eval: true
+
+  dir: data/extract
+  output-dir: data/result
   tb-log-dir: logs/tensorboard/
+
+  article-file: giga-article.txt
+  summary-file: giga-summary.txt
+  vocab-file: giga-vocab.txt
+  emb-file: embedding
+  model-file:
+  save-model-file: giga-model.ckpt

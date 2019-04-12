@@ -72,7 +72,7 @@ class Seq2Seq(nn.Module):
         dec_hidden = enc_hidden_n
 
         # initial decoder cell = encoder last cell
-        dec_cell = enc_cell_n
+        dec_cell = cuda(t.zeros(batch_size, 2 * self.hidden_size))
 
         # encoder temporal attention score
         enc_temporal_score = None   # B, L
@@ -94,6 +94,9 @@ class Seq2Seq(nn.Module):
         #
         max_oov_len = max([len(vocab) for vocab in oov])
 
+        #
+        enc_ctx_vector = cuda(t.zeros(batch_size, 2 * self.hidden_size))
+
         for i in range(self.max_dec_steps):
             # decoding
             vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, _, enc_temporal_score = self.decode(
@@ -104,6 +107,7 @@ class Seq2Seq(nn.Module):
                 enc_outputs,
                 enc_padding_mask,
                 enc_temporal_score,
+                enc_ctx_vector,
                 extend_vocab_x,
                 max_oov_len)
 
@@ -150,6 +154,7 @@ class Seq2Seq(nn.Module):
                enc_hiddens,
                enc_padding_mask,
                enc_temporal_score,
+               enc_ctx_vector,
                extend_vocab_x,
                max_oov_len):
 
@@ -157,7 +162,7 @@ class Seq2Seq(nn.Module):
         dec_input = self.embedding(dec_input)   # B, E
 
         # current hidden & cell
-        dec_hidden, dec_cell = self.decoder(dec_input, dec_hidden if pre_dec_hiddens is None else pre_dec_hiddens[:, -1, :], dec_cell)  # B, 2H
+        dec_hidden, dec_cell = self.decoder(dec_input, dec_hidden if pre_dec_hiddens is None else pre_dec_hiddens[:, -1, :], dec_cell, enc_ctx_vector)  # B, 2H
 
         # intra-temporal encoder attention
 

@@ -4,7 +4,7 @@ from main.common.common import *
 from main.seq2seq import Seq2Seq
 from main.common.simple_vocab import SimpleVocab
 from main.common.util.file_util import FileUtil
-from main.data.giga import GigaDataLoader
+from main.data.giga import *
 
 
 class TestConfiguration(TestCase):
@@ -15,16 +15,23 @@ class TestConfiguration(TestCase):
 
         vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
 
-        model = Seq2Seq(vocab)
-        model.load_state_dict(t.load(FileUtil.get_file_path(conf.get('model-file')), map_location='cpu'))
+        seq2seq = Seq2Seq(vocab)
 
-        model.eval()
+        checkpoint = t.load(FileUtil.get_file_path(conf.get('model-file')))
 
-        article, _ = data_loader.next()
+        seq2seq.load_state_dict(checkpoint['model_state_dict'])
 
-        summary = model.summarize(article)
+        seq2seq.eval()
 
-        print(summary)
+        samples = data_loader.read_all()
+
+        article, reference = samples[3]
+
+        summary = seq2seq.summarize(article)
+
+        print('>>> article: ', article)
+        print('>>> reference: ', reference)
+        print('>>> prediction: ', summary)
 
 
 

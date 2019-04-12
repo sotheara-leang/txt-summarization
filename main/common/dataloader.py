@@ -28,6 +28,18 @@ class DataLoader(object):
         except StopIteration:
             return None
 
+    def read_all(self):
+        samples = []
+        while True:
+            sample = self.next()
+            if sample is None:
+                self.reset()
+                break
+
+            samples.append(sample)
+        return samples
+
     def reset(self):
         self.generator = self.reader()
+
 
