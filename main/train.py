@@ -25,23 +25,21 @@ class Train(object):
         self.batch_size                 = conf.get('train:batch-size')
         self.clip_gradient_max_norm     = conf.get('train:clip-gradient-max-norm')
         self.log_batch                  = conf.get('train:log-batch')
+        self.log_batch_interval         = conf.get('train:log-batch-interval', -1)
         self.lr                         = conf.get('train:lr')
         self.lr_decay_epoch             = conf.get('train:lr-decay-epoch')
         self.lr_decay                   = conf.get('train:lr-decay')
 
         self.ml_enable                  = conf.get('train:ml:enable')
-        self.ml_forcing_ratio           = conf.get('train:ml:forcing-ratio')
-        self.ml_forcing_decay           = conf.get('train:ml:forcing-decay')
+        self.ml_forcing_ratio           = conf.get('train:ml:forcing-ratio', 1)
+        self.ml_forcing_decay           = conf.get('train:ml:forcing-decay', 0)
 
         self.rl_enable                  = conf.get('train:rl:enable')
         self.rl_weight                  = conf.get('train:rl:weight')
-        self.rl_transit_epoch           = conf.get('train:rl:transit-epoch')
-        self.rl_transit_decay           = conf.get('train:rl:transit-decay')
+        self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
+        self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
 
-        self.dir                        = conf.get('train:dir')
-        if not self.dir:
-            logger.warning('train directory not defined')
-            return
+        self.dir                        = conf.get('train:dir', 'data/extract￿')
 
         self.vocab = SimpleVocab(FileUtil.get_file_path(self.dir + '/' + conf.get('train:vocab-file')), conf.get('vocab-size'))
         #self.vocab = GloveVocab(FileUtil.get_file_path(self.dir + '/' + conf.get('train:vocab-file')))
@@ -321,16 +319,19 @@ class Train(object):
                 loss, ml_loss, rl_loss, samples_reward, enable_rl = self.train_batch(batch, i+1)
 
                 if self.log_batch:
-                    # log to tensorboard
-                    self.tb_writer.add_scalar('Batch_Train/Loss', loss, total_batch_counter + 1)
-                    self.tb_writer.add_scalar('Batch_Train/ML-Loss', ml_loss, total_batch_counter + 1)
-                    self.tb_writer.add_scalar('Batch_Train/RL-Loss', rl_loss, total_batch_counter + 1)
 
-                    if enable_rl:
-                        logger.debug('BAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f', batch_counter+1,
-                                     loss, ml_loss, rl_loss, samples_reward)
-                    else:
-                        logger.debug('BAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA', batch_counter+1, loss, ml_loss)
+                    if self.log_batch_interval <= 0 or batch_counter % self.log_batch_interval == 0:
+
+                        # log to tensorboard
+                        self.tb_writer.add_scalar('Batch_Train/Loss', loss, total_batch_counter + 1)
+                        self.tb_writer.add_scalar('Batch_Train/ML-Loss', ml_loss, total_batch_counter + 1)
+                        self.tb_writer.add_scalar('Batch_Train/RL-Loss', rl_loss, total_batch_counter + 1)
+
+                        if enable_rl:
+                            logger.debug('BAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f', batch_counter+1,
+                                         loss, ml_loss, rl_loss, samples_reward)
+                        else:
+                            logger.debug('BAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA', batch_counter+1, loss, ml_loss)
 
                 total_loss          += loss
                 total_ml_loss       += ml_loss
@@ -363,7 +364,7 @@ class Train(object):
         return i, epoch_loss
 
     def evaluate(self):
-        is_enable = conf.get('train:eval')
+        is_enable = conf.get('train:eval', False)
         if is_enable is False:
             return
 
@@ -419,18 +420,13 @@ class Train(object):
             logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
 
     def save_model(self, args):
-        output_dir = conf.get('train:output-dir')
-        if not output_dir:
-            logger.warning('output dir is undefined')
-            return
-
-        output_dir = FileUtil.get_file_path(output_dir)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
         model_file = conf.get('train:save-model-file')
         if not model_file:
             return
+
+        output_dir = FileUtil.get_file_path(conf.get('train:output-dir', 'data/result'))
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
         model_file = output_dir + '/' + model_file
 

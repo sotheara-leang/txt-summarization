@@ -16,12 +16,17 @@ class Configuration:
     def exist(self, key):
         return True if self.get(key) is not None else False
 
-    def get(self, key):
+    def get(self, key, default=None):
         keys = key.split(':')
         if len(keys) > 1:
-            return self.__get_nest_value(self.cfg[keys[0]], keys[1:])
+            value = self.__get_nest_value(self.cfg[keys[0]], keys[1:])
         else:
-            return self.cfg[key]
+            value = self.cfg[key]
+
+        if value is None and default is not None:
+            value = default
+
+        return value
 
     def set(self, key, value):
         self.cfg.__setitem__(key, value)

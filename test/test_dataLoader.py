@@ -9,12 +9,15 @@ class TestDataLoader(TestCase):
 
     def test(self):
         dataloader = GigaDataLoader(
-            FileUtil.get_file_path(conf.get('train:article-file')),
-            FileUtil.get_file_path(conf.get('train:summary-file')), 15)
+            FileUtil.get_file_path(conf.get('train:dir') + '/' + conf.get('train:article-file')),
+            FileUtil.get_file_path(conf.get('train:dir') + '/' + conf.get('train:summary-file')), 15)
 
-        batch = dataloader.next()
+        while True:
+            batch = dataloader.next_batch()
+            if batch is None:
+                break
 
-        print(batch)
+            print(batch)
 
 
 

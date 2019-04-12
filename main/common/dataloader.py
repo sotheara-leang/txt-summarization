@@ -13,7 +13,7 @@ class DataLoader(object):
         for i in range(0, self.batch_size):
             try:
                 sample = next(self.generator)
-            except StopIteration:
+            except Exception:
                 return None
 
             if sample is None:
@@ -25,7 +25,7 @@ class DataLoader(object):
     def next(self):
         try:
             return next(self.generator)
-        except StopIteration:
+        except Exception as e:
             return None
 
     def read_all(self):
