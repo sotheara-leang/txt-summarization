@@ -374,20 +374,25 @@ class Train(object):
         rouge = Rouge()
         scores = []
 
-        samples = self.data_loader.read_all()
-        for sample in samples:
-            article = sample[0]
-            ref_summary = sample[1]
+        while True:
+            batch = self.data_loader.next_batch()
 
-            gen_summary = self.seq2seq.summarize(article)
+            if batch is None:
+                break
 
-            rouge_score = rouge.get_scores(gen_summary, ref_summary)[0]
+            for sample in batch:
+                article = sample[0]
+                ref_summary = sample[1]
 
-            scores.append(rouge_score["rouge-l"]["f"])
+                gen_summary = self.seq2seq.summarize(article)
+
+                rouge_score = rouge.get_scores(gen_summary, ref_summary)[0]
+
+                scores.append(rouge_score["rouge-l"]["f"])
 
         avg_score = sum(scores) / len(scores)
 
-        logger.debug('examples: %d', len(samples))
+        logger.debug('examples: %d', len(scores))
         logger.debug('avg rouge-l score: %.3f', avg_score)
 
     def load_model(self):
