@@ -1,6 +1,6 @@
+import logging
+import logging.config
 import yaml
-import os
-
 from yaml import Loader, Dumper
 from singleton_decorator import singleton
 from main.common.util.file_util import FileUtil
@@ -12,6 +12,10 @@ class Configuration:
     def __init__(self):
         with open(FileUtil.get_file_path("main/conf/config.yml"), 'r') as file:
             self.cfg = yaml.load(file, Loader=Loader)
+
+        with open(FileUtil.get_file_path("main/conf/logging.yml"), 'r') as f:
+            config = yaml.safe_load(f.read())
+            logging.config.dictConfig(config)
 
     def exist(self, key):
         return True if self.get(key) is not None else False

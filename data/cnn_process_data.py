@@ -2,6 +2,11 @@ import argparse
 import os
 import collections
 import re
+import spacy
+
+from main.common.util.file_util import FileUtil
+
+nlp = spacy.load("en_core_web_sm")
 
 ptb_unescape = {'-lrb-': '(', '-rrb-': ')', '-lcb-': '{', '-rcb-': '}', '<t>': '', '</t>': ''}
 
@@ -15,7 +20,7 @@ def count_samples(file_in):
     return counter
 
 
-def generate_vocab(files_in, dir_out, vocab_fname, max_vocab):
+def generate_vocab(files_in, dir_out, fname, max_vocab):
     if not os.path.exists(dir_out):
         os.makedirs(dir_out)
 
@@ -31,10 +36,24 @@ def generate_vocab(files_in, dir_out, vocab_fname, max_vocab):
                 if line == '':
                     break
 
-                words = normalize_string(line).split(' ')
+                doc = nlp(line.lower())
 
-                words = [token.strip() for token in words if token not in ptb_unescape.keys()
-                         and token is not '<t>']
+                words = []
+                for lexeme in doc:
+
+                    if lexeme.is_digit \
+                            or lexeme.is_title \
+                            or lexeme.like_email \
+                            or lexeme.like_url \
+                            or lexeme.like_num \
+                            or lexeme.is_space \
+                            or lexeme.is_space\
+                            or lexeme.text in ptb_unescape.keys() \
+                            or lexeme.text == '<t>':
+
+                        continue
+
+                    words.append(lexeme.text)
 
                 vocab_counter.update(words)
 
@@ -45,7 +64,7 @@ def generate_vocab(files_in, dir_out, vocab_fname, max_vocab):
         if reach_max_vocab is True:
             break
 
-    output_fname = 'vocab.txt' if vocab_fname is None else vocab_fname
+    output_fname = 'vocab.txt' if fname is None else fname
 
     # write vocab
     with open(dir_out + '/' + output_fname, 'w') as writer:
@@ -57,7 +76,7 @@ def generate_vocab(files_in, dir_out, vocab_fname, max_vocab):
             writer.write(token + ' ' + str(count) + '\n')
 
 
-def extract_samples(file_in, start_index, end_index, dir_out):
+def extract_samples(file_in, start_index, end_index, dir_out, fname):
     path, filename = os.path.split(file_in)
 
     if not os.path.exists(dir_out):
@@ -65,7 +84,9 @@ def extract_samples(file_in, start_index, end_index, dir_out):
 
     counter = 0
 
-    with open(file_in, 'r') as reader, open(dir_out + '/' + filename, 'w') as writer:
+    output_fname = filename if fname is None else fname
+
+    with open(file_in, 'r') as reader, open(dir_out + '/' + output_fname, 'w') as writer:
         while counter <= end_index:
             line = reader.readline()
 
@@ -94,30 +115,22 @@ def extract_samples(file_in, start_index, end_index, dir_out):
             counter += 1
 
 
-def normalize_string(string):
-    return string.lower()
-
-
-def valid_vocab(string):
-    return string != '' and re.match('^([a-z]+)|([a-z]+-[a-z]+)|[\'\"(),.?!]$', string)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--opt', type=str, default="extract")
+    parser.add_argument('--opt', type=str, default="gen-vocab")
     parser.add_argument('--file', '--names-list', nargs="*")
     parser.add_argument('--dir_out', type=str, default="extract")
     parser.add_argument('--max_vocab', type=int, default="-1")
     parser.add_argument('--sindex', type=int, default="0")
     parser.add_argument('--eindex', type=int, default="999")
-    parser.add_argument('--vocab_fname', type=str, default="vocab.txt")
+    parser.add_argument('--fname', type=str)
 
     args = parser.parse_args()
 
     if args.opt == 'gen-vocab':
-        generate_vocab(args.file, args.dir_out, args.vocab_fname, args.max_vocab)
+        generate_vocab([FileUtil.get_file_path('data/raw/cnn-article.txt')], args.dir_out, args.fname, args.max_vocab)
     elif args.opt == 'count':
         print(count_samples(args.file))
     elif args.opt == 'extract':
-        extract_samples(args.file[0], args.sindex, args.eindex, args.dir_out)
+        extract_samples(args.file[0], args.sindex, args.eindex, args.dir_out, args.fname)

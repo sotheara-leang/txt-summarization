@@ -64,7 +64,7 @@ def generate_vocab(files_in, dir_out, vocab_fname, max_vocab):
                 if line == '':
                     break
 
-                tokens = normalize_string(line).split(' ')
+                tokens = normalize_string(line).split()
 
                 valid_tokens = []
                 for token in tokens:

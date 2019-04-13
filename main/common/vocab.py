@@ -10,6 +10,8 @@ TK_STOP         = {'word': '[STOP]',    'id': 3}
 class Vocab(object):
 
     def __init__(self, word2id, id2word):
+        self.logger = getLogger(self)
+
         self._word2id = word2id
         self._id2word = id2word
 
@@ -57,7 +59,7 @@ class Vocab(object):
                     try:
                         w = oovs[id_ - self.size()]
                     except IndexError:
-                        logger.warning('word id "%s" not found in %s' + str(id_), oovs)
+                        self.logger.warning('word id "%s" not found in %s' + str(id_), oovs)
                         w = TK_UNKNOWN['word']
                 else:
                     w = TK_UNKNOWN['word']

@@ -1,5 +1,6 @@
 import csv
 import collections
+import os
 
 from main.common.util.file_util import FileUtil
 from main.common.vocab import *
@@ -10,16 +11,22 @@ class SimpleVocab(Vocab):
     def __init__(self, vocab_file, vocab_size=None):
         super(SimpleVocab, self).__init__({}, {})
 
+        self.logger = getLogger(self)
+
         # read the vocab file
 
         vocab_map = {}
 
-        with open(FileUtil.get_file_path(vocab_file), 'r') as vocab_f:
-            for line in vocab_f:
+        vocab_file = FileUtil.get_file_path(vocab_file)
+        if not os.path.isfile(vocab_file):
+            self.logger.debug('>>> error loading vocab file - file not found: %s', vocab_file)
+
+        with open(vocab_file, 'r') as reader:
+            for line in reader:
                 pieces = line.split()
 
                 if len(pieces) != 2:
-                    logger.error('Warning: incorrectly formatted line in vocabulary file: %s\n' % line)
+                    self.logger.error('Warning: incorrectly formatted line in vocabulary file: %s\n' % line)
                     continue
 
                 token = pieces[0]
@@ -48,7 +55,7 @@ class SimpleVocab(Vocab):
             count += 1
 
     def write_metadata(self, file_path):
-        print("Writing word embedding metadata to %s..." % file_path)
+        self.logger.debug("Writing word embedding metadata to %s...", file_path)
         with open(file_path, "w") as f:
             fieldnames = ['word']
             writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)

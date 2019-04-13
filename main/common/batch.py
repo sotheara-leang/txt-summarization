@@ -29,7 +29,13 @@ class BatchInitializer(object):
     def init(self, samples):
         articles, summaries = list(zip(*samples))
 
-        articles_len = [len(a.split()) + 1 for a in articles]       # +1 for STOP_DECODING
+        # article
+        articles_words = []
+        for article in articles:
+            words = self.truncate(article.split(), self.max_enc_steps)
+            articles_words.append(words)
+
+        articles_len = [len(a) + 1 for a in articles_words]       # +1 for STOP_DECODING
         max_article_len = max(articles_len)
 
         enc_articles = []
@@ -37,19 +43,14 @@ class BatchInitializer(object):
         enc_articles_padding_mask = []
         oovs = []
 
-        # article
-        for article in articles:
-            art_words = article.split()
-            if len(art_words) > self.max_enc_steps:  # truncate
-                art_words = art_words[:self.max_enc_steps]
-
-            enc_article = self.vocab.words2ids(art_words) + [TK_STOP['id']]
+        for article_words in articles_words:
+            enc_article = self.vocab.words2ids(article_words) + [TK_STOP['id']]
 
             enc_article_padding_mask = [1] * len(enc_article) + [0] * (max_article_len - len(enc_article))
 
             enc_article += [TK_PADDING['id']] * (max_article_len - len(enc_article))
 
-            enc_extend_vocab_article, article_oovs = self.vocab.extend_words2ids(art_words)
+            enc_extend_vocab_article, article_oovs = self.vocab.extend_words2ids(article_words)
             enc_extend_vocab_article += [TK_STOP['id']]
             enc_extend_vocab_article += [TK_PADDING['id']] * (max_article_len - len(enc_extend_vocab_article))
 
@@ -59,16 +60,16 @@ class BatchInitializer(object):
             oovs.append(article_oovs)
 
         # summary
-        summaries_len = [len(s.split()) + 1 for s in summaries]  # +1 for STOP_DECODING
+        summaries_words = []
+        for summary in summaries:
+            words = self.truncate(summary.split(), self.max_dec_steps)
+            summaries_words.append(words)
+
+        summaries_len = [len(s) + 1 for s in summaries_words]  # +1 for STOP_DECODING
         max_summary_len = max(summaries_len)
 
         enc_summaries = []
-
-        for i, summary in enumerate(summaries):
-            summary_words = summary.split()
-            if len(summary_words) > self.max_dec_steps:  # truncate
-                summary_words = summary_words[:self.max_dec_steps]
-
+        for i, summary_words in enumerate(summaries_words):
             enc_summary = self.vocab.words2ids(summary_words, oovs[i]) + [TK_STOP['id']]
             enc_summary += [TK_PADDING['id']] * (max_summary_len - len(enc_summary))
 
@@ -97,4 +98,7 @@ class BatchInitializer(object):
                      summaries_len,
                      summaries)
 
-
+    def truncate(self, words, length):
+        if len(words) > length:
+            return words[:length]
+        return words

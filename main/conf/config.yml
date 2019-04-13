@@ -13,14 +13,14 @@ sharing-decoder-weight: true
 
 train:
   epoch: 5
-  batch-size: 20
+  batch-size: 50
   log-batch: true
-  log-batch-interval: -1
+  log-batch-interval: 1
   clip-gradient-max-norm: 1
 
   lr: 0.001
-  lr-decay: 0.9
-  lr-decay-epoch: 40
+  lr-decay: 1
+  lr-decay-epoch: 50
 
   ml:
     enable: true
@@ -36,7 +36,7 @@ train:
 
   dir: data/extract
   output-dir: data/result
-  tb-log-dir: logs/tensorboard/
+  tb-log-dir: logs/giga-5k/
 
   article-file: giga-article.txt
   summary-file: giga-summary.txt

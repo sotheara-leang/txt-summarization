@@ -52,11 +52,11 @@ class Seq2Seq(nn.Module):
             :params
                 x                : B, L
                 x_len            : L
-                extend_vocab_x   : B, V + OOV
-                oov              : B, L
+                extend_vocab_x   : B, L
+                oov              : B, OOV
 
             :returns
-                y                : B, L
+                y                : B, M
     '''
     def forward(self, x, x_len, extend_vocab_x, oov):
         batch_size = len(x)
@@ -198,11 +198,13 @@ class Seq2Seq(nn.Module):
 
     '''
         :params
-            x       :
+            x       : article
         :returns
-            y       :
+            y       : summary
     '''
     def summarize(self, x):
+        self.eval()
+
         words = x.split()
 
         x = cuda(t.tensor(self.vocab.words2ids(words) + [TK_STOP['id']]).unsqueeze(0))
