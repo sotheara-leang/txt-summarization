@@ -17,17 +17,17 @@ class SimpleVocab(Vocab):
 
         vocab_map = {}
 
-        vocab_file = FileUtil.get_file_path(vocab_file)
         if not os.path.isfile(vocab_file):
-            self.logger.debug('>>> error loading vocab file - file not found: %s', vocab_file)
+            raise Exception('vocab file not exist: %s' % vocab_file)
+
+        self.logger.debug('initialize vocabulary from: %s', vocab_file)
 
         with open(vocab_file, 'r') as reader:
             for line in reader:
                 pieces = line.split()
 
                 if len(pieces) != 2:
-                    self.logger.error('Warning: incorrectly formatted line in vocabulary file: %s\n' % line)
-                    continue
+                    raise Exception('incorrectly formatted line in vocabulary file: %s' % line)
 
                 token = pieces[0]
                 token_count = int(pieces[1])

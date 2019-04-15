@@ -41,19 +41,17 @@ class Train(object):
         self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
         self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
 
-        self.dir                        = conf.get('train:dir', 'data/extract￿')
-
-        self.vocab = SimpleVocab(FileUtil.get_file_path(self.dir + '/' + conf.get('train:vocab-file')), conf.get('vocab-size'))
-        #self.vocab = GloveVocab(FileUtil.get_file_path(self.dir + '/' + conf.get('train:vocab-file')))
+        self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('train:vocab-file')), conf.get('vocab-size'))
+        #self.vocab = GloveVocab(FileUtil.get_file_path(conf.get('train:vocab-file')))
 
         self.seq2seq = cuda(Seq2Seq(self.vocab))
 
-        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(self.dir + '/' + conf.get('train:emb-file')))))
+        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(conf.get('train:emb-file')))))
 
         self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps)
 
-        self.data_loader = GigaDataLoader(FileUtil.get_file_path(self.dir + '/' + conf.get('train:article-file')),
-                                          FileUtil.get_file_path(self.dir + '/' + conf.get('train:summary-file')), self.batch_size)
+        self.data_loader = GigaDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
+                                          FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
 
         self.optimizer = t.optim.Adam(self.seq2seq.parameters(), lr=self.lr)
 
@@ -402,7 +400,7 @@ class Train(object):
         model_file = conf.get('train:model-file')
         if model_file is None:
             return
-        model_file = FileUtil.get_file_path(self.dir + '/' + model_file)
+        model_file = FileUtil.get_file_path(model_file)
 
         if os.path.isfile(model_file):
             self.logger.debug('>>> load pre-trained model from: %s', model_file)
@@ -426,12 +424,6 @@ class Train(object):
         if not model_file:
             return
 
-        output_dir = FileUtil.get_file_path(conf.get('train:output-dir', 'data/result'))
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        model_file = output_dir + '/' + model_file
-
         self.logger.debug('>>> save model into: ' + model_file)
 
         t.save({
@@ -452,7 +444,7 @@ class Train(object):
         epoch, loss = self.train()
 
         # evaluate
-        # self.evaluate()
+        self.evaluate()
 
         # save model
         self.save_model({'epoch': epoch, 'loss': loss})

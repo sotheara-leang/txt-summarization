@@ -1,10 +1,10 @@
-emb-size: 50 # 100 - Glove
-hidden-size: 50 # 200
+emb-size: 5 # 100 - Glove
+hidden-size: 5 # 200
 
 max-enc-steps: 100
 max-dec-steps: 100
 
-vocab-size: 50000
+vocab-size: 10000
 vocab-file: data/extract/giga-vocab.txt
 
 model-file: data/extract/giga-model.ckpt
@@ -13,7 +13,7 @@ sharing-decoder-weight: true
 
 train:
   epoch: 5
-  batch-size: 50
+  batch-size: 20
   log-batch: true
   log-batch-interval: 1
   clip-gradient-max-norm: 1
@@ -34,13 +34,11 @@ train:
 
   eval: true
 
-  dir: data/extract
-  output-dir: data/result
   tb-log-dir: logs/giga-5k/
 
-  article-file: giga-article.txt
-  summary-file: giga-summary.txt
-  vocab-file: giga-vocab.txt
-  emb-file: embedding
+  article-file: data/extract/giga-article.txt
+  summary-file: data/extract/giga-summary.txt
+  vocab-file: data/extract/giga-vocab.txt
+  emb-file: data/extract/embedding
   model-file:
-  save-model-file: giga-model.ckpt
+  save-model-file: data/extract/giga-model.ckpt
