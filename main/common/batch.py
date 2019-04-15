@@ -4,7 +4,15 @@ from main.common.common import *
 
 class Batch(object):
 
-    def __init__(self, articles, articles_len, articles_padding_mask, extend_vocab_articles, oovs, summaries, summaries_len, original_summaries):
+    def __init__(self, articles,
+                 articles_len,
+                 articles_padding_mask,
+                 extend_vocab_articles,
+                 oovs,
+                 summaries,
+                 summaries_len,
+                 original_summaries):
+
         self.articles = articles
         self.articles_len = articles_len
         self.extend_vocab_articles = extend_vocab_articles

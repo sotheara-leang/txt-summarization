@@ -2,7 +2,6 @@ import csv
 import collections
 import os
 
-from main.common.util.file_util import FileUtil
 from main.common.vocab import *
 
 

@@ -53,12 +53,12 @@ class Seq2Seq(nn.Module):
                 x                : B, L
                 x_len            : L
                 extend_vocab_x   : B, L
-                oov              : B, OOV
+                max_oov_len      : C
 
             :returns
                 y                : B, M
     '''
-    def forward(self, x, x_len, extend_vocab_x, oov):
+    def forward(self, x, x_len, extend_vocab_x, max_oov_len):
         batch_size = len(x)
 
         x = self.embedding(x)  # B, L, E
@@ -90,9 +90,6 @@ class Seq2Seq(nn.Module):
 
         # stop decoding mask
         stop_dec_mask = cuda(t.zeros(len(x)))
-
-        #
-        max_oov_len = max([len(vocab) for vocab in oov])
 
         #
         enc_ctx_vector = cuda(t.zeros(batch_size, 2 * self.hidden_size))
@@ -212,8 +209,9 @@ class Seq2Seq(nn.Module):
 
         extend_vocab_x, oov = self.vocab.extend_words2ids(words)
         extend_vocab_x = cuda(t.tensor(extend_vocab_x).unsqueeze(0))
-        oovs = [oov]
 
-        y = self.forward(x, x_len, extend_vocab_x, oovs)[0].squeeze(0)
+        max_oov_len = len(oov)
+
+        y = self.forward(x, x_len, extend_vocab_x, max_oov_len)[0].squeeze(0)
 
         return ' '.join(self.vocab.ids2words(y.tolist(), oov))
