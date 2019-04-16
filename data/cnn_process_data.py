@@ -1,10 +1,7 @@
 import argparse
 import os
 import collections
-import re
 import spacy
-
-from main.common.util.file_util import FileUtil
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -129,8 +126,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.opt == 'gen-vocab':
-        generate_vocab([FileUtil.get_file_path('data/raw/cnn-article.txt')], args.dir_out, args.fname, args.max_vocab)
+        generate_vocab(args.file, args.dir_out, args.fname, args.max_vocab)
     elif args.opt == 'count':
-        print(count_samples(args.file))
+        print(count_samples(args.file[0]))
     elif args.opt == 'extract':
         extract_samples(args.file[0], args.sindex, args.eindex, args.dir_out, args.fname)

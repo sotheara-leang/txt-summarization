@@ -15,7 +15,7 @@ class TestSeq2Seq(TestCase):
 
         vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
 
-        seq2seq = Seq2Seq(vocab)
+        seq2seq = cuda(Seq2Seq(vocab))
 
         checkpoint = t.load(FileUtil.get_file_path(conf.get('model-file')))
 
