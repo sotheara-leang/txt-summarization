@@ -4,6 +4,8 @@ from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
 import math
 import os
+import time
+import datetime
 
 from main.data.giga import *
 from main.seq2seq import Seq2Seq
@@ -60,6 +62,8 @@ class Train(object):
         self.tb_writer = SummaryWriter(FileUtil.get_file_path(conf.get('train:tb-log-dir')))
 
     def train_batch(self, batch, epoch_counter):
+        start_time = time.time()
+
         self.optimizer.zero_grad()
 
         rouge       = Rouge()
@@ -148,7 +152,9 @@ class Train(object):
 
         self.optimizer.step()
 
-        return loss, ml_loss, rl_loss, reward, rl_enable
+        time_spent = time.time() - start_time
+
+        return loss, ml_loss, rl_loss, reward, rl_enable, time_spent
 
     def train_ml(self, enc_outputs, dec_hidden, dec_cell, dec_input, batch, epoch_counter):
         y                       = None  # B, T
@@ -292,7 +298,6 @@ class Train(object):
         criterion_scheduler = t.optim.lr_scheduler.StepLR(self.optimizer, self.lr_decay_epoch, self.lr_decay)
 
         for i in range(self.epoch):
-
             self.logger.debug('========================= epoch %i/%i =========================', i + 1, self.epoch)
 
             batch_counter       = 0
@@ -302,10 +307,11 @@ class Train(object):
             total_rl_loss       = 0
             total_samples_award = 0
 
+            epoch_time_spent    = 0
+
             criterion_scheduler.step()
 
             while True:
-
                 # get next batch
                 batch = self.data_loader.next_batch()
 
@@ -316,7 +322,9 @@ class Train(object):
                 batch = self.batch_initializer.init(batch)
 
                 # feed batch to model
-                loss, ml_loss, rl_loss, samples_reward, enable_rl = self.train_batch(batch, i+1)
+                loss, ml_loss, rl_loss, samples_reward, enable_rl, time_spent = self.train_batch(batch, i+1)
+
+                epoch_time_spent += time_spent
 
                 if self.log_batch:
 
@@ -328,10 +336,11 @@ class Train(object):
                         self.tb_writer.add_scalar('Batch_Train/RL-Loss', rl_loss, total_batch_counter + 1)
 
                         if enable_rl:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f', i + 1, batch_counter + 1,
-                                         loss, ml_loss, rl_loss, samples_reward)
+                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s', i + 1, batch_counter + 1,
+                                         loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))
                         else:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA', i + 1, batch_counter + 1, loss, ml_loss)
+                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s', i + 1,
+                                              batch_counter + 1, loss, ml_loss, str(datetime.timedelta(seconds=time_spent)))
 
                 total_loss          += loss
                 total_ml_loss       += ml_loss
@@ -357,6 +366,8 @@ class Train(object):
                 self.logger.debug('rl-loss_avg\t=\t%.3f,\t reward=%.3f', epoch_rl_loss, epoch_samples_award)
             else:
                 self.logger.debug('rl-loss_avg\t=\tNA')
+
+            self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
 
             # reload data set
             self.data_loader.reset()

@@ -212,6 +212,6 @@ class Seq2Seq(nn.Module):
 
         max_oov_len = len(oov)
 
-        y = self.forward(x, x_len, extend_vocab_x, max_oov_len)[0].squeeze(0)
+        y = self.forward(x, x_len, extend_vocab_x, max_oov_len)[0]
 
         return ' '.join(self.vocab.ids2words(y.tolist(), oov))
