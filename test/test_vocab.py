@@ -8,7 +8,7 @@ from main.common.simple_vocab import SimpleVocab
 class TestVocab(TestCase):
 
     def test(self):
-        vocab = SimpleVocab(FileUtil.get_file_path(conf.get('train:vocab-file')), conf.get('vocab-size'))
+        vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
 
         print(vocab.word2id('australia'))
 

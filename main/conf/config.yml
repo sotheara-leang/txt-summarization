@@ -1,4 +1,6 @@
-emb-size: 5 # 100 - Glove
+emb-size: 5 # 100
+emb-file: data/extract/embedding
+
 hidden-size: 5 # 200
 
 max-enc-steps: 100
@@ -12,7 +14,7 @@ model-file: data/extract/giga-model.ckpt
 sharing-decoder-weight: true
 
 train:
-  epoch: 5
+  epoch: 1
   batch-size: 20
   log-batch: true
   log-batch-interval: 1
@@ -38,7 +40,6 @@ train:
 
   article-file: data/extract/giga-article.txt
   summary-file: data/extract/giga-summary.txt
-  vocab-file: data/extract/giga-vocab.txt
-  emb-file: data/extract/embedding
-  model-file:
+
+  load-model-file:
   save-model-file: data/extract/giga-model.ckpt

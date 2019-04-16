@@ -43,12 +43,12 @@ class Train(object):
         self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
         self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
 
-        self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('train:vocab-file')), conf.get('vocab-size'))
-        #self.vocab = GloveVocab(FileUtil.get_file_path(conf.get('train:vocab-file')))
+        self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
+        #self.vocab = GloveVocab(FileUtil.get_file_path(conf.get('vocab-file')))
 
         self.seq2seq = cuda(Seq2Seq(self.vocab))
 
-        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(conf.get('train:emb-file')))))
+        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(conf.get('emb-file')))))
 
         self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps)
 
@@ -408,7 +408,7 @@ class Train(object):
         self.logger.debug('avg rouge-l score: %.3f', avg_score)
 
     def load_model(self):
-        model_file = conf.get('train:model-file')
+        model_file = conf.get('train:load-model-file')
         if model_file is None:
             return
         model_file = FileUtil.get_file_path(model_file)

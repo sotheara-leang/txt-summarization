@@ -12,10 +12,15 @@ class TestDataLoader(TestCase):
             FileUtil.get_file_path(conf.get('train:article-file')),
             FileUtil.get_file_path(conf.get('train:summary-file')), 15)
 
+        counter = 0
         while True:
             batch = dataloader.next_batch()
             if batch is None:
                 break
+
+            counter += len(batch)
+
+            print(counter)
 
             print(batch)
 

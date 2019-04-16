@@ -11,21 +11,22 @@ class DataLoader(object):
     def next_batch(self):
         samples = []
         for i in range(0, self.batch_size):
+            sample = None
             try:
                 sample = next(self.generator)
             except Exception:
-                return None
+                pass
 
             if sample is None:
                 break
             samples.append(sample)
 
-        return samples
+        return samples if len(samples) > 0 else None
 
     def next(self):
         try:
             return next(self.generator)
-        except Exception as e:
+        except Exception:
             return None
 
     def read_all(self):
@@ -33,10 +34,12 @@ class DataLoader(object):
         while True:
             sample = self.next()
             if sample is None:
-                self.reset()
                 break
 
             samples.append(sample)
+
+        self.reset()
+
         return samples
 
     def reset(self):

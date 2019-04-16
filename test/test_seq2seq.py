@@ -7,7 +7,7 @@ from main.common.util.file_util import FileUtil
 from main.data.giga import *
 
 
-class TestConfiguration(TestCase):
+class TestSeq2Seq(TestCase):
 
     def test(self):
         data_loader = GigaDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),

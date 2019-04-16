@@ -3,7 +3,7 @@ from main.common.glove.vocab import *
 from main.common.util.file_util import FileUtil
 
 
-class TestConfiguration(TestCase):
+class TestGloveVocab(TestCase):
 
     def test(self):
         GloveVocab(FileUtil.get_file_path('data/extract/giga-vocab.bin'))
