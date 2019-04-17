@@ -67,20 +67,19 @@ class Train(object):
         self.optimizer.zero_grad()
 
         rouge       = Rouge()
-        dec_input   = cuda(t.tensor([TK_START['id']] * self.batch_size))  # B
 
         ## encoding input
 
         x = self.seq2seq.embedding(batch.articles)  # B, L, E
 
-        enc_outputs, (enc_hidden, enc_cell) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2H), (B, 2H), (B, 2H)
+        enc_outputs, (enc_hidden, _) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2H), (B, 2H), (B, 2H)
 
         enc_cell = cuda(t.zeros(self.batch_size, 2 * self.hidden_size))
 
         ## ML
 
         if self.ml_enable:
-            output = self.train_ml(enc_outputs, enc_hidden, enc_cell, dec_input, batch, epoch_counter)
+            output = self.train_ml(enc_outputs, enc_hidden, enc_cell, batch, epoch_counter)
 
             ml_loss = t.sum(output[1], dim=1) / batch.summaries_len.float()
             ml_loss = t.mean(ml_loss)
@@ -98,11 +97,11 @@ class Train(object):
 
         if rl_enable:
             # sampling
-            sampling_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, dec_input, batch, True)
+            sampling_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, batch, True)
 
             # greedy search
             with t.autograd.no_grad():
-                baseline_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, dec_input, batch, False)
+                baseline_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, batch, False)
 
             # convert decoded output to string
 
@@ -156,21 +155,20 @@ class Train(object):
 
         return loss, ml_loss, rl_loss, reward, rl_enable, time_spent
 
-    def train_ml(self, enc_outputs, dec_hidden, dec_cell, dec_input, batch, epoch_counter):
+    def train_ml(self, enc_outputs, dec_hidden, dec_cell, batch, epoch_counter):
         y                       = None  # B, T
         loss                    = None  # B, T
         enc_temporal_score      = None  # B, L
         pre_dec_hiddens         = None  # B, T, 2H
-        stop_decoding_mask      = cuda(t.zeros(self.batch_size))     # B
-        extend_vocab_articles   = batch.extend_vocab_articles        # B, L
-        articles_padding_mask   = batch.articles_padding_mask  # B, L
+        stop_decoding_mask      = cuda(t.zeros(self.batch_size))    # B
+        extend_vocab_articles   = batch.extend_vocab_articles       # B, L
+        articles_padding_mask   = batch.articles_padding_mask       # B, L
         target_y                = batch.summaries
         max_dec_len             = max(batch.summaries_len)
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
+        dec_input               = batch.summaries[:, 0]
 
-        enc_ctx_vector          = cuda(t.zeros(self.batch_size, 2 * self.hidden_size))
-
-        for i in range(max_dec_len):
+        for i in range(max_dec_len - 1):
             ## decoding
             vocab_dist, dec_hidden, dec_cell, _, _, enc_temporal_score = self.seq2seq.decode(
                 dec_input,
@@ -180,18 +178,12 @@ class Train(object):
                 enc_outputs,
                 articles_padding_mask,
                 enc_temporal_score,
-                enc_ctx_vector,
                 extend_vocab_articles,
                 max_ovv_len)
 
             ## loss
 
-            step_loss = self.criterion(t.log(vocab_dist + 1e-10), target_y[:, i])  # B
-
-            for v in step_loss:
-                if math.isnan(v) or math.isinf(v):
-                    print('>>>> step_loss', step_loss)
-                    return
+            step_loss = self.criterion(t.log(vocab_dist + 1e-10), target_y[:, i + 1])  # B
 
             loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)  # B, L
 
@@ -215,7 +207,7 @@ class Train(object):
             use_ground_truth = t.randn(self.batch_size) < forcing_ratio  # B
             use_ground_truth = cuda(use_ground_truth.long())
 
-            dec_input = use_ground_truth * target_y[:, i] + (1 - use_ground_truth) * dec_output  # B
+            dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output  # B
 
             ## if next decoder input is oov, change it to UNKNOWN_TOKEN
 
@@ -227,7 +219,7 @@ class Train(object):
 
         return y, loss
 
-    def train_rl(self, enc_outputs, dec_hidden, dec_cell, dec_input, batch, sampling):
+    def train_rl(self, enc_outputs, dec_hidden, dec_cell, batch, sampling):
         y                       = None  # B, T
         loss                    = None  # B, T
         enc_temporal_score      = None  # B, L
@@ -236,8 +228,7 @@ class Train(object):
         articles_padding_mask   = batch.articles_padding_mask       # B, L
         extend_vocab_articles   = batch.extend_vocab_articles       # B, L
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
-
-        enc_ctx_vector = cuda(t.zeros(self.batch_size, 2 * self.hidden_size))
+        dec_input               = batch.summaries[:, 0]
 
         for i in range(self.max_dec_steps):
             ## decoding
@@ -249,7 +240,6 @@ class Train(object):
                 enc_outputs,
                 articles_padding_mask,
                 enc_temporal_score,
-                enc_ctx_vector,
                 extend_vocab_articles,
                 max_ovv_len)
 
@@ -323,6 +313,8 @@ class Train(object):
 
                 # feed batch to model
                 loss, ml_loss, rl_loss, samples_reward, enable_rl, time_spent = self.train_batch(batch, i+1)
+
+                return
 
                 epoch_time_spent += time_spent
 

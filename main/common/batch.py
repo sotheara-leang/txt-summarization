@@ -43,7 +43,7 @@ class BatchInitializer(object):
             words = self.truncate(article.split(), self.max_enc_steps)
             articles_words.append(words)
 
-        articles_len = [len(a) + 1 for a in articles_words]       # +1 for STOP_DECODING
+        articles_len = [len(a) + 1 for a in articles_words]       # +1 for STOP
         max_article_len = max(articles_len)
 
         enc_articles = []
@@ -73,12 +73,12 @@ class BatchInitializer(object):
             words = self.truncate(summary.split(), self.max_dec_steps)
             summaries_words.append(words)
 
-        summaries_len = [len(s) + 1 for s in summaries_words]  # +1 for STOP_DECODING
+        summaries_len = [len(s) + 2 for s in summaries_words]  # +2 for START & STOP
         max_summary_len = max(summaries_len)
 
         enc_summaries = []
         for i, summary_words in enumerate(summaries_words):
-            enc_summary = self.vocab.words2ids(summary_words, oovs[i]) + [TK_STOP['id']]
+            enc_summary = [TK_START['id']] + self.vocab.words2ids(summary_words, oovs[i]) + [TK_STOP['id']]
             enc_summary += [TK_PADDING['id']] * (max_summary_len - len(enc_summary))
 
             enc_summaries.append(enc_summary)
