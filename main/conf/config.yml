@@ -36,10 +36,11 @@ train:
 
   eval: true
 
-  tb-log-dir: logs/giga-5k/
+  tb-log-dir: logs/giga/
 
   article-file: data/extract/giga-article.txt
   summary-file: data/extract/giga-summary.txt
 
   load-model-file:
   save-model-file: data/extract/giga-model.ckpt
+  save-model-per-epoch:

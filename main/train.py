@@ -2,7 +2,6 @@ from rouge import Rouge
 import torch.nn as nn
 from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
-import math
 import os
 import time
 import datetime
@@ -42,6 +41,8 @@ class Train(object):
         self.rl_weight                  = conf.get('train:rl:weight')
         self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
         self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
+
+        self.save_model_per_epoch       = conf.get('train:save-model-per-epoch')
 
         self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
         #self.vocab = GloveVocab(FileUtil.get_file_path(conf.get('vocab-file')))
@@ -314,8 +315,6 @@ class Train(object):
                 # feed batch to model
                 loss, ml_loss, rl_loss, samples_reward, enable_rl, time_spent = self.train_batch(batch, i+1)
 
-                return
-
                 epoch_time_spent += time_spent
 
                 if self.log_batch:
@@ -358,7 +357,12 @@ class Train(object):
             # reload data set
             self.data_loader.reset()
 
-        return i, epoch_loss
+            # save model per epoch
+            if self.save_model_per_epoch is not None and i > 0 and i % self.save_model_per_epoch == 0:
+                self.save_model({'epoch': i, 'loss': epoch_loss}, True)
+
+        # save model
+        self.save_model({'epoch': i, 'loss': epoch_loss}, False)
 
     def evaluate(self):
         is_enable = conf.get('train:eval', False)
@@ -416,10 +420,15 @@ class Train(object):
         else:
             self.logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
 
-    def save_model(self, args):
+    def save_model(self, args, save_epoch):
         model_file = conf.get('train:save-model-file')
         if not model_file:
             return
+
+        if save_epoch is True:
+            dot = model_file.rfind('.')
+            if dot != -1:
+                model_file = model_file[:dot] + '-' + str(args['epoch']) + model_file[dot:]
 
         self.logger.debug('>>> save model into: ' + model_file)
 
@@ -438,13 +447,10 @@ class Train(object):
         self.load_model()
 
         # train
-        epoch, loss = self.train()
+        self.train()
 
         # evaluate
         self.evaluate()
-
-        # save model
-        self.save_model({'epoch': epoch, 'loss': loss})
 
 
 if __name__ == "__main__":

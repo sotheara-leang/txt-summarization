@@ -2,13 +2,13 @@ import os
 import argparse
 import collections
 import re
-from main.common.util.file_util import FileUtil
+import string
+import tqdm
 
 
 def count_samples(file_name):
     counter = 0
     with open(file_name, 'r') as reader:
-
         while reader.readline() != '':
             counter += 1
 
@@ -21,22 +21,20 @@ def extract_samples(file_in, start_index, end_index, dir_out, fname):
     if not os.path.exists(dir_out):
         os.makedirs(dir_out)
 
-    counter = 0
+    counter = 1
 
     output_fname = filename if fname is None else fname
 
     with open(file_in, 'r') as reader, open(dir_out + '/' + output_fname, 'w') as writer:
-        while counter <= end_index:
-            line = reader.readline()
+        for line in tqdm.tqdm(reader):
 
-            if line == '':
+            if line == '' or counter > end_index:
                 break
 
             if counter < start_index:
                 counter += 1
                 continue
 
-            line = normalize_string(line)
             line = line.strip()
 
             if line == '':
@@ -58,17 +56,17 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
         with open(file, 'r') as reader:
 
             # build vocab
-            for line in reader:
+            for line in tqdm.tqdm(reader):
 
                 if line == '':
                     break
 
-                tokens = normalize_string(line).split()
+                tokens = line.split()
 
                 valid_tokens = []
                 for token in tokens:
                     token = token.strip()
-                    if not valid_vocab(token):
+                    if not valid_token(token):
                         continue
 
                     valid_tokens.append(token)
@@ -85,7 +83,7 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
     output_fname = 'vocab.txt' if fname is None else fname
 
     with open(dir_out + '/' + output_fname, 'w') as writer:
-        vocab_counter = sorted(vocab_counter.items())
+        vocab_counter = sorted(vocab_counter.items(), key=lambda e: e[1], reverse=True)
 
         for i, element in enumerate(vocab_counter):
             if max_vocab > 0 and i >= max_vocab:
@@ -93,17 +91,16 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
 
             token = element[0]
             count = element[1]
+
             writer.write(token + ' ' + str(count) + '\n')
 
 
-def normalize_string(string):
-    return string.lower()
-
-
-def valid_vocab(string):
-    return string != '' and re.match('^([a-z]+)|[a-z]+(-[a-z]+)+|[\'\"(),.?!]|\'(a-z)+$', string) \
-                and not string.endswith('#') \
-                and not string.endswith('.com')
+def valid_token(token):
+    return token in string.punctuation or \
+           (token != ''
+            and re.match('^([a-z]+)|[a-z]+(-[a-z]+)+|\'(a-z)+$', token)
+            and not token.endswith('#')
+            and not token.endswith('.com'))
 
 
 if __name__ == '__main__':
@@ -113,8 +110,8 @@ if __name__ == '__main__':
     parser.add_argument('--file', '--names-list', nargs="*")
     parser.add_argument('--dir_out', type=str, default="extract")
     parser.add_argument('--max_vocab', type=int, default="-1")
-    parser.add_argument('--sindex', type=int, default="0")
-    parser.add_argument('--eindex', type=int, default="999")
+    parser.add_argument('--sindex', type=int, default="1")
+    parser.add_argument('--eindex', type=int, default="1000")
     parser.add_argument('--fname', type=str)
 
     args = parser.parse_args()
