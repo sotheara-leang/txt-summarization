@@ -1,4 +1,3 @@
-import torch as t
 import torch.nn as nn
 import torch.nn.functional as f
 
@@ -24,7 +23,7 @@ class DecoderAttention(nn.Module):
         if pre_dec_hiddens is None:
             ctx_vector = cuda(t.zeros(dec_hidden.size()))
         else:
-            dec_hidden = dec_hidden.unsqueeze(1).expand(-1, pre_dec_hiddens.size(1), -1).contiguous() # B, T, 2H
+            dec_hidden = dec_hidden.unsqueeze(1).expand(-1, pre_dec_hiddens.size(1), -1).contiguous()   # B, T, 2H
 
             score = self.attn(dec_hidden, pre_dec_hiddens).squeeze(2)   # B, T
 
@@ -37,4 +36,4 @@ class DecoderAttention(nn.Module):
             ctx_vector = t.bmm(attention.unsqueeze(1), pre_dec_hiddens)  # B, 1, T * B, T, 2H  =>  B, 1, 2H
             ctx_vector = ctx_vector.squeeze(1)  # B, 2H
 
-        return ctx_vector
+        return ctx_vector, attention

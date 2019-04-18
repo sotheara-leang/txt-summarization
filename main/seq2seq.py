@@ -165,7 +165,7 @@ class Seq2Seq(nn.Module):
 
         # intra-decoder attention
 
-        dec_ctx_vector = self.dec_att(dec_hidden, pre_dec_hiddens)  # B, 2H
+        dec_ctx_vector, _ = self.dec_att(dec_hidden, pre_dec_hiddens)  # B, 2H
 
         # pointer-generator
 

@@ -165,7 +165,7 @@ class Train(object):
         articles_padding_mask   = batch.articles_padding_mask       # B, L
         target_y                = batch.summaries
         max_dec_len             = max(batch.summaries_len)
-        max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
+        max_ovv_len             = max([len(oov) for oov in batch.oovs])
         dec_input               = batch.summaries[:, 0]
 
         for i in range(max_dec_len - 1):
@@ -321,12 +321,6 @@ class Train(object):
                 if self.log_batch:
 
                     if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
-
-                        # log to tensorboard
-                        self.tb_writer.add_scalar('Batch_Train/Loss', loss, total_batch_counter + 1)
-                        self.tb_writer.add_scalar('Batch_Train/ML-Loss', ml_loss, total_batch_counter + 1)
-                        self.tb_writer.add_scalar('Batch_Train/RL-Loss', rl_loss, total_batch_counter + 1)
-
                         if enable_rl:
                             self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s', i + 1, batch_counter + 1,
                                          loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))

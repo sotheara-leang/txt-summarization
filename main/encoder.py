@@ -14,7 +14,7 @@ class Encoder(nn.Module):
     '''
         :param
             x       : B, L, E
-            x_len   : L
+            x_len   : B
             
         :return
             outputs : B, L, 2H
@@ -33,9 +33,9 @@ class Encoder(nn.Module):
         outputs = outputs.contiguous()
 
         # B, 2H
-        hidden = hidden.view(-1, outputs.size(2))
+        hidden = t.cat(list(hidden), dim=1)
 
         # B, 2H
-        cell = cell.view(-1, outputs.size(2))
+        cell = t.cat(list(cell), dim=1)
 
         return outputs, (hidden, cell)

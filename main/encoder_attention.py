@@ -32,7 +32,7 @@ class EncoderAttention(nn.Module):
         exp_score = t.exp(score)    # B, L
         if enc_temporal_score is None:
             score = exp_score
-            enc_temporal_score = cuda(t.zeros(score.size()).fill_(1e-10)) + exp_score
+            enc_temporal_score = exp_score
         else:
             score = exp_score / enc_temporal_score
             enc_temporal_score = enc_temporal_score + exp_score
