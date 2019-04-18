@@ -96,11 +96,10 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
 
 
 def valid_token(token):
-    return token in string.punctuation or \
-           (token != ''
-            and re.match('^([a-z]+)|[a-z]+(-[a-z]+)+|\'(a-z)+$', token)
-            and not token.endswith('#')
-            and not token.endswith('.com'))
+    return token != '' \
+            and re.match('^[a-z]+|[a-z]+(-[a-z]+)+|\'[a-z]+$', token) \
+            and not token.endswith('#') \
+            and not token.endswith('.com')
 
 
 if __name__ == '__main__':

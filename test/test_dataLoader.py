@@ -2,13 +2,13 @@ from unittest import TestCase
 
 from main.common.common import *
 from main.common.util.file_util import FileUtil
-from main.data.giga import GigaDataLoader
+from main.data.giga_world import GigaWorldDataLoader
 
 
 class TestDataLoader(TestCase):
 
     def test(self):
-        dataloader = GigaDataLoader(
+        dataloader = GigaWorldDataLoader(
             FileUtil.get_file_path(conf.get('train:article-file')),
             FileUtil.get_file_path(conf.get('train:summary-file')), 15)
 

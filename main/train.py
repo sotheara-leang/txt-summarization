@@ -6,7 +6,7 @@ import os
 import time
 import datetime
 
-from main.data.giga import *
+from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
 from main.common.batch import *
 from main.common.util.file_util import FileUtil
@@ -53,8 +53,8 @@ class Train(object):
 
         self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps)
 
-        self.data_loader = GigaDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
-                                          FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
+        self.data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
+                                               FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
 
         self.optimizer = t.optim.Adam(self.seq2seq.parameters(), lr=self.lr)
 
@@ -424,6 +424,12 @@ class Train(object):
         model_file = conf.get('train:save-model-file')
         if not model_file:
             return
+
+        model_file = FileUtil.get_file_path(model_file)
+
+        file_dir, _ = os.path.split(model_file)
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
 
         if save_epoch is True:
             dot = model_file.rfind('.')

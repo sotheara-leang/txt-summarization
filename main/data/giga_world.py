@@ -1,10 +1,10 @@
 from main.common.dataloader import *
 
 
-class GigaDataLoader(DataLoader):
+class GigaWorldDataLoader(DataLoader):
 
     def __init__(self, article_file, summary_file, batch_size):
-        super(GigaDataLoader, self).__init__(batch_size)
+        super(GigaWorldDataLoader, self).__init__(batch_size)
 
         self.article_file = article_file
         self.summary_file = summary_file
