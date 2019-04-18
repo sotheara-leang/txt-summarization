@@ -285,6 +285,7 @@ class Train(object):
         self.logger.debug('>>> training:')
 
         total_batch_counter = 0
+        train_time      = time.time()
 
         criterion_scheduler = t.optim.lr_scheduler.StepLR(self.optimizer, self.lr_decay_epoch, self.lr_decay)
 
@@ -358,11 +359,12 @@ class Train(object):
             self.data_loader.reset()
 
             # save model per epoch
-            if self.save_model_per_epoch is not None and i > 0 and i % self.save_model_per_epoch == 0:
-                self.save_model({'epoch': i, 'loss': epoch_loss}, True)
+            if i == self.epoch - 1 \
+                    or (self.save_model_per_epoch is not None and i > 0 and i % self.save_model_per_epoch == 0):
+                self.save_model({'epoch': i, 'loss': epoch_loss}, i != self.epoch - 1)
 
-        # save model
-        self.save_model({'epoch': i, 'loss': epoch_loss}, False)
+        train_time = time.time() - train_time
+        self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=train_time)))
 
     def evaluate(self):
         is_enable = conf.get('train:eval', False)
@@ -375,6 +377,7 @@ class Train(object):
 
         rouge = Rouge()
         scores = []
+        eval_time = time.time()
 
         while True:
             batch = self.data_loader.next_batch()
@@ -394,8 +397,11 @@ class Train(object):
 
         avg_score = sum(scores) / len(scores)
 
+        eval_time = time.time() - eval_time
+
         self.logger.debug('examples: %d', len(scores))
         self.logger.debug('avg rouge-l score: %.3f', avg_score)
+        self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=eval_time)))
 
     def load_model(self):
         model_file = conf.get('train:load-model-file')

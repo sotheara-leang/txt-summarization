@@ -5,6 +5,8 @@ import re
 import string
 import tqdm
 
+ptb_unescape = {'<unk>': '[UNK]'}
+
 
 def count_samples(file_name):
     counter = 0
@@ -36,6 +38,9 @@ def extract_samples(file_in, start_index, end_index, dir_out, fname):
                 continue
 
             line = line.strip()
+
+            for abbr, sign in ptb_unescape.items():
+                line = line.replace(abbr, sign)
 
             if line == '':
                 continue
@@ -96,10 +101,11 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
 
 
 def valid_token(token):
-    return token != '' \
-            and re.match('^[a-z]+|[a-z]+(-[a-z]+)+|\'[a-z]+$', token) \
-            and not token.endswith('#') \
-            and not token.endswith('.com')
+    return token in string.punctuation or \
+           (token != ''
+            and re.match('^[a-z]+|[a-z]+(-[a-z]+)+|\'[a-z]+|``|\'\'$', token)
+            and not token.endswith('#')
+            and not token.endswith('.com'))
 
 
 if __name__ == '__main__':
