@@ -21,14 +21,19 @@ class Configuration:
         return True if self.get(key) is not None else False
 
     def get(self, key, default=None):
-        keys = key.split(':')
-        if len(keys) > 1:
-            value = self.__get_nest_value(self.cfg[keys[0]], keys[1:])
-        else:
-            value = self.cfg[key]
+        value = None
+        try:
+            keys = key.split(':')
+            if len(keys) > 1:
+                value = self.__get_nest_value(self.cfg[keys[0]], keys[1:])
+            else:
+                value = self.cfg[key]
 
-        if value is None and default is not None:
-            value = default
+            if value is None and default is not None:
+                value = default
+
+        except Exception:
+            pass
 
         return value
 

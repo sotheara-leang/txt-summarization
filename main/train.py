@@ -42,6 +42,8 @@ class Train(object):
         self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
         self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
 
+        self.tb_log_dir                 = conf.get('train:rl:train:tb-log-dir')
+
         self.save_model_per_epoch       = conf.get('train:save-model-per-epoch')
 
         self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
@@ -60,7 +62,8 @@ class Train(object):
 
         self.criterion = nn.NLLLoss(reduction='none', ignore_index=TK_PADDING['id'])
 
-        self.tb_writer = SummaryWriter(FileUtil.get_file_path(conf.get('train:tb-log-dir')))
+        if self.tb_log_dir is not None:
+            self.tb_writer = SummaryWriter(FileUtil.get_file_path(self.tb_log_dir))
 
     def train_batch(self, batch, epoch_counter):
         start_time = time.time()
@@ -342,9 +345,10 @@ class Train(object):
             epoch_samples_award = total_samples_award / batch_counter
 
             # log to tensorboard
-            self.tb_writer.add_scalar('Epoch_Train/Loss', loss, i + 1)
-            self.tb_writer.add_scalar('Epoch_Train/ML-Loss', ml_loss, i + 1)
-            self.tb_writer.add_scalar('Epoch_Train/RL-Loss', rl_loss, i + 1)
+            if self.tb_log_dir is not None:
+                self.tb_writer.add_scalar('Epoch_Train/Loss', loss, i + 1)
+                self.tb_writer.add_scalar('Epoch_Train/ML-Loss', ml_loss, i + 1)
+                self.tb_writer.add_scalar('Epoch_Train/RL-Loss', rl_loss, i + 1)
 
             self.logger.debug('loss_avg\t=\t%.3f', epoch_loss)
             self.logger.debug('ml-loss-avg\t=\t%.3f', epoch_ml_loss)

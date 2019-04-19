@@ -27,7 +27,7 @@ def extract_samples(file_in, start_index, end_index, dir_out, fname):
 
     output_fname = filename if fname is None else fname
 
-    with open(file_in, 'r') as reader, open(dir_out + '/' + output_fname, 'w') as writer:
+    with open(file_in, 'r', encoding='utf-8') as reader, open(dir_out + '/' + output_fname, 'w', encoding='utf-8') as writer:
         for line in tqdm.tqdm(reader):
 
             if line == '' or counter > end_index:
@@ -58,7 +58,7 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
     vocab_counter = collections.Counter()
 
     for file in files_in:
-        with open(file, 'r') as reader:
+        with open(file, 'r', encoding='utf-8') as reader:
 
             # build vocab
             for line in tqdm.tqdm(reader):
@@ -87,7 +87,7 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
 
     output_fname = 'vocab.txt' if fname is None else fname
 
-    with open(dir_out + '/' + output_fname, 'w') as writer:
+    with open(dir_out + '/' + output_fname, 'w', encoding='utf-8') as writer:
         vocab_counter = sorted(vocab_counter.items(), key=lambda e: e[1], reverse=True)
 
         for i, element in enumerate(vocab_counter):
