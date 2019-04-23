@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.utils.rnn as rnn
 import torch.nn.functional as f
 
 from main.common.common import *
@@ -15,11 +14,13 @@ class ReduceEncoder(nn.Module):
         self.reduce_c = nn.Linear(2 * conf.get('enc-hidden-size'), conf.get('dec-hidden-size'))
 
     '''
-        :param
-           
+        :params
+           hidden   :   2, B, EH 
+           cell     :   2, B, EH
             
-        :return
-           
+        :returns
+           hidden   :   B, DH
+           cell     :   B, DH
     '''
     def forward(self, hidden, cell):
         hidden = t.cat(list(hidden), dim=1)

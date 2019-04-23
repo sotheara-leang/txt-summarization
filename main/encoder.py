@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn
-import torch.nn.functional as f
 
 from main.common.common import *
 
@@ -13,11 +12,11 @@ class Encoder(nn.Module):
         self.lstm = nn.LSTM(conf.get('emb-size'), conf.get('enc-hidden-size'), num_layers=1, batch_first=True, bidirectional=True)
 
     '''
-        :param
+        :params
             x       : B, L, E
             x_len   : B
             
-        :return
+        :returns
             outputs : B, L, 2EH
             hidden  : 2, B, EH
             cell    : 2, B, EH

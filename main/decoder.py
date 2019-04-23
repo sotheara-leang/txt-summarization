@@ -15,6 +15,7 @@ class Decoder(nn.Module):
             y               : B, E
             pre_hidden      : B, DH
             pre_cell        : B, DH
+            
         :returns
             hidden          : B, DH
             cell            : B, DH   

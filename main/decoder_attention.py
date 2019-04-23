@@ -22,7 +22,7 @@ class DecoderAttention(nn.Module):
     def forward(self, dec_hidden, pre_dec_hiddens):
         if pre_dec_hiddens is None:
             ctx_vector = cuda(t.zeros(dec_hidden.size()))
-            attention = None
+            attention = cuda(t.zeros(dec_hidden.size()))
         else:
             dec_hidden = dec_hidden.unsqueeze(1).expand(-1, pre_dec_hiddens.size(1), -1).contiguous()   # B, T, DH
 
@@ -35,6 +35,6 @@ class DecoderAttention(nn.Module):
             # context vector
 
             ctx_vector = t.bmm(attention.unsqueeze(1), pre_dec_hiddens)  # (B, 1, T) * (B, T, DH)  =>  B, 1, DH
-            ctx_vector = ctx_vector.squeeze(1)  # B, 2H
+            ctx_vector = ctx_vector.squeeze(1)  # B, DH
 
         return ctx_vector, attention

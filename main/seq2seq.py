@@ -136,15 +136,15 @@ class Seq2Seq(nn.Module):
             enc_hiddens             :   B, L, EH
             enc_padding_mask        :   B, L
             enc_temporal_score      :   B, L
-            extend_vocab_x          :   B, V + OOV
+            extend_vocab_x          :   B, L
             max_oov_len             :   C
             
         :returns
-            vocab_dist          :   B, V + OOV
-            dec_hidden          :   B, DH
-            enc_ctx_vector      :   B, EH
-            enc_temporal_score  :   B, L
-            dec_ctx_vector      :   B, DH
+            vocab_dist              :   B, V + OOV
+            dec_hidden              :   B, DH
+            enc_ctx_vector          :   B, EH
+            enc_temporal_score      :   B, L
+            dec_ctx_vector          :   B, DH
     '''
     def decode(self, dec_input,
                dec_hidden,
@@ -166,7 +166,7 @@ class Seq2Seq(nn.Module):
 
         # enc_ctx_vector        : B, EH
         # enc_att               : B, L
-        # sum_temporal_score    : B, L
+        # enc_temporal_score    : B, L
         enc_ctx_vector, enc_att, enc_temporal_score = self.enc_att(dec_hidden, enc_hiddens, enc_padding_mask, enc_temporal_score)
 
         # intra-decoder attention
@@ -175,15 +175,15 @@ class Seq2Seq(nn.Module):
 
         # pointer-generator
 
-        combine_input = t.cat([dec_hidden, enc_ctx_vector, dec_ctx_vector], dim=1)
+        combined_input = t.cat([dec_hidden, enc_ctx_vector, dec_ctx_vector], dim=1)
 
-        ptr_prob = t.sigmoid(self.ptr_gen(combine_input))  # B
+        ptr_prob = t.sigmoid(self.ptr_gen(combined_input))  # B
 
         ptr_dist = ptr_prob * enc_att  # B, L
 
         # vocab distribution
 
-        vocab_dist = f.softmax(self.vocab_gen(combine_input), dim=1)  # B, V
+        vocab_dist = f.softmax(self.vocab_gen(combined_input), dim=1)  # B, V
         vocab_dist = (1 - ptr_prob) * vocab_dist
 
         # final vocab distribution

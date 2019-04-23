@@ -165,8 +165,8 @@ class Train(object):
         y                       = None  # B, T
         loss                    = None  # B, T
         enc_temporal_score      = None  # B, L
-        pre_dec_hiddens         = None  # B, T, 2H
-        stop_decoding_mask      = cuda(t.zeros(batch.size))    # B
+        pre_dec_hiddens         = None  # B, T, DH
+        stop_decoding_mask      = cuda(t.zeros(batch.size))         # B
         extend_vocab_articles   = batch.extend_vocab_articles       # B, L
         articles_padding_mask   = batch.articles_padding_mask       # B, L
         target_y                = batch.summaries
@@ -200,7 +200,7 @@ class Train(object):
 
             ## output
 
-            _, dec_output = t.max(vocab_dist, dim=1)
+            dec_output = t.multinomial(vocab_dist, 1).squeeze()
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
@@ -220,7 +220,7 @@ class Train(object):
 
             dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output  # B
 
-            ## if next decoder input is oov, change it to UNKNOWN_TOKEN
+            ## if next decoder input is oov, change it to TK_UNKNOWN
 
             is_oov = (dec_input >= self.vocab.size()).long()
 
@@ -234,8 +234,8 @@ class Train(object):
         y                       = None  # B, T
         loss                    = None  # B, T
         enc_temporal_score      = None  # B, L
-        pre_dec_hiddens         = None  # B, T, 2H
-        stop_decoding_mask      = cuda(t.zeros(batch.size))    # B
+        pre_dec_hiddens         = None  # B, T, DH
+        stop_decoding_mask      = cuda(t.zeros(batch.size))         # B
         articles_padding_mask   = batch.articles_padding_mask       # B, L
         extend_vocab_articles   = batch.extend_vocab_articles       # B, L
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
@@ -266,7 +266,7 @@ class Train(object):
                 ## greedy search
                 _, dec_output = t.max(vocab_dist, dim=1)
 
-            ## y
+            ## output
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
@@ -277,9 +277,9 @@ class Train(object):
             if len(stop_decoding_mask[stop_decoding_mask == 1]) == len(stop_decoding_mask):
                 break
 
-            dec_input = dec_output
+            ## if next decoder input is oov, change it to TK_UNKNOWN
 
-            ## if next decoder input is oov, change it to UNKNOWN_TOKEN
+            dec_input = dec_output
 
             is_oov = (dec_input >= self.vocab.size()).long()
 
