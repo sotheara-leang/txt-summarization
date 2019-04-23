@@ -5,6 +5,7 @@ from tensorboardX import SummaryWriter
 import os
 import time
 import datetime
+import math
 
 from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
@@ -42,7 +43,7 @@ class Train(object):
         self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
         self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
 
-        self.tb_log_dir                 = conf.get('train:rl:train:tb-log-dir')
+        self.tb_log_dir                 = conf.get('train:tb-log-dir')
 
         self.save_model_per_epoch       = conf.get('train:save-model-per-epoch')
 
@@ -78,7 +79,7 @@ class Train(object):
 
         enc_outputs, (enc_hidden, _) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2H), (B, 2H), (B, 2H)
 
-        enc_cell = cuda(t.zeros(self.batch_size, 2 * self.hidden_size))
+        enc_cell = cuda(t.zeros(batch.size, 2 * self.hidden_size))
 
         ## ML
 
@@ -164,7 +165,7 @@ class Train(object):
         loss                    = None  # B, T
         enc_temporal_score      = None  # B, L
         pre_dec_hiddens         = None  # B, T, 2H
-        stop_decoding_mask      = cuda(t.zeros(self.batch_size))    # B
+        stop_decoding_mask      = cuda(t.zeros(batch.size))    # B
         extend_vocab_articles   = batch.extend_vocab_articles       # B, L
         articles_padding_mask   = batch.articles_padding_mask       # B, L
         target_y                = batch.summaries
@@ -187,7 +188,12 @@ class Train(object):
 
             ## loss
 
-            step_loss = self.criterion(t.log(vocab_dist + 1e-10), target_y[:, i + 1])  # B
+            step_loss = self.criterion(t.log(vocab_dist + 1e-20), target_y[:, i + 1])  # B
+
+            for v in step_loss:
+                if math.isnan(v) or math.isinf(v):
+                    print('>>>> step_loss', step_loss)
+                    return
 
             loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)  # B, L
 
@@ -208,7 +214,7 @@ class Train(object):
 
             forcing_ratio = max(0, self.ml_forcing_ratio - self.ml_forcing_decay * epoch_counter)
 
-            use_ground_truth = t.randn(self.batch_size) < forcing_ratio  # B
+            use_ground_truth = t.rand(batch.size) < forcing_ratio  # B
             use_ground_truth = cuda(use_ground_truth.long())
 
             dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output  # B
@@ -228,7 +234,7 @@ class Train(object):
         loss                    = None  # B, T
         enc_temporal_score      = None  # B, L
         pre_dec_hiddens         = None  # B, T, 2H
-        stop_decoding_mask      = cuda(t.zeros(self.batch_size))    # B
+        stop_decoding_mask      = cuda(t.zeros(batch.size))    # B
         articles_padding_mask   = batch.articles_padding_mask       # B, L
         extend_vocab_articles   = batch.extend_vocab_articles       # B, L
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
@@ -363,8 +369,7 @@ class Train(object):
             self.data_loader.reset()
 
             # save model per epoch
-            if i == self.epoch - 1 \
-                    or (self.save_model_per_epoch is not None and i > 0 and i % self.save_model_per_epoch == 0):
+            if i == self.epoch - 1 or (self.save_model_per_epoch is not None and (i + 1) % self.save_model_per_epoch == 0):
                 self.save_model({'epoch': i, 'loss': epoch_loss}, i != self.epoch - 1)
 
         train_time = time.time() - train_time

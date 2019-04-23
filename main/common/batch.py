@@ -26,6 +26,8 @@ class Batch(object):
         # to evaluate rouge score
         self.original_summaries = original_summaries
 
+        self.size = len(articles)
+
 
 class BatchInitializer(object):
 

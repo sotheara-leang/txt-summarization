@@ -186,8 +186,6 @@ class Seq2Seq(nn.Module):
         final_vocab_dist[:, :self.vocab.size()] = vocab_dist
         final_vocab_dist.scatter_add(1, extend_vocab_x, ptr_dist)
 
-        final_vocab_dist = f.softmax(final_vocab_dist, dim=1)
-
         return final_vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, dec_ctx_vector, enc_temporal_score
 
     '''
@@ -205,6 +203,8 @@ class Seq2Seq(nn.Module):
         x_len = cuda(t.tensor([len(words) + 1]))
 
         extend_vocab_x, oov = self.vocab.extend_words2ids(words)
+
+        extend_vocab_x = extend_vocab_x + [TK_STOP['id']]
         extend_vocab_x = cuda(t.tensor(extend_vocab_x).unsqueeze(0))
 
         max_oov_len = len(oov)
