@@ -176,7 +176,7 @@ class Train(object):
 
         for i in range(max_dec_len - 1):
             ## decoding
-            vocab_dist, dec_hidden, dec_cell, _, _, enc_temporal_score = self.seq2seq.decode(
+            vocab_dist, dec_hidden, dec_cell, _, enc_temporal_score, _ = self.seq2seq.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,
@@ -243,7 +243,7 @@ class Train(object):
 
         for i in range(self.max_dec_steps):
             ## decoding
-            vocab_dist, dec_hidden, dec_cell, _, _, enc_temporal_score = self.seq2seq.decode(
+            vocab_dist, dec_hidden, dec_cell, _, enc_temporal_score, _ = self.seq2seq.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,

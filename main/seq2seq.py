@@ -72,21 +72,14 @@ class Seq2Seq(nn.Module):
 
         enc_hidden_n, enc_cell_n = self.reduce_encoder(enc_hidden_n, enc_cell_n)
 
-        # initial decoder input = TK_START
-        dec_input = cuda(t.tensor([TK_START['id']] * batch_size))  # B
-
         # initial decoder hidden = encoder last hidden
         dec_hidden = enc_hidden_n
 
         # initial decoder cell = encoder last cell
         dec_cell = enc_cell_n
 
-        # encoder temporal attention score
-        enc_temporal_score = None   # B, L
-
-        pre_dec_hiddens = None  # B, T, DH
-
-        y = None  # B, L
+        # initial decoder input = TK_START
+        dec_input = cuda(t.tensor([TK_START['id']] * batch_size))  # B
 
         #
         enc_padding_mask = t.zeros(batch_size, max(x_len))
@@ -97,6 +90,12 @@ class Seq2Seq(nn.Module):
 
         # stop decoding mask
         stop_dec_mask = cuda(t.zeros(len(x)))
+
+        enc_temporal_score = None  # B, L
+
+        pre_dec_hiddens = None  # B, T, DH
+
+        y = None  # B, L
 
         for i in range(self.max_dec_steps):
             # decoding
@@ -144,8 +143,8 @@ class Seq2Seq(nn.Module):
             vocab_dist          :   B, V + OOV
             dec_hidden          :   B, DH
             enc_ctx_vector      :   B, EH
-            dec_ctx_vector      :   B, DH
             enc_temporal_score  :   B, L
+            dec_ctx_vector      :   B, DH
     '''
     def decode(self, dec_input,
                dec_hidden,
@@ -165,7 +164,7 @@ class Seq2Seq(nn.Module):
 
         # intra-temporal encoder attention
 
-        # enc_ctx_vector        : B, 2H
+        # enc_ctx_vector        : B, EH
         # enc_att               : B, L
         # sum_temporal_score    : B, L
         enc_ctx_vector, enc_att, enc_temporal_score = self.enc_att(dec_hidden, enc_hiddens, enc_padding_mask, enc_temporal_score)
@@ -193,7 +192,7 @@ class Seq2Seq(nn.Module):
         final_vocab_dist[:, :self.vocab.size()] = vocab_dist
         final_vocab_dist.scatter_add(1, extend_vocab_x, ptr_dist)
 
-        return final_vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, dec_ctx_vector, enc_temporal_score
+        return final_vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, dec_ctx_vector
 
     '''
         :params
