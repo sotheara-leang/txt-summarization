@@ -21,7 +21,8 @@ class Train(object):
     def __init__(self):
         self.logger                     = getLogger(self)
 
-        self.hidden_size                = conf.get('hidden-size')
+        self.dec_hidden_size            = conf.get('dec-hidden-size')
+
         self.max_enc_steps              = conf.get('max-enc-steps')
         self.max_dec_steps              = conf.get('max-dec-steps')
 
@@ -71,15 +72,15 @@ class Train(object):
 
         self.optimizer.zero_grad()
 
-        rouge       = Rouge()
+        rouge = Rouge()
 
         ## encoding input
 
         x = self.seq2seq.embedding(batch.articles)  # B, L, E
 
-        enc_outputs, (enc_hidden, _) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2H), (B, 2H), (B, 2H)
+        enc_outputs, (enc_hidden, enc_cell_n) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2EH), (2, B, EH), (2, B, EH)
 
-        enc_cell = cuda(t.zeros(batch.size, 2 * self.hidden_size))
+        enc_hidden, enc_cell = self.seq2seq.reduce_encoder(enc_hidden, enc_cell_n) # (B, DH), (B, DH)
 
         ## ML
 

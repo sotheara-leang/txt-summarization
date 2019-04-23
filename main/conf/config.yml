@@ -1,7 +1,8 @@
 emb-size: 5 # 100
 emb-file: data/extract/embedding
 
-hidden-size: 5 # 200
+enc-hidden-size: 5 # 200
+dec-hidden-size: 10 # 400
 
 max-enc-steps: 100
 max-dec-steps: 100
@@ -11,7 +12,7 @@ vocab-file: data/extract/giga-vocab.txt
 
 model-file: data/extract/giga-model.ckpt
 
-sharing-decoder-weight: true
+share-dec-weight: true
 
 train:
   epoch: 1
@@ -42,5 +43,5 @@ train:
   summary-file: data/extract/giga-summary.txt
 
   load-model-file:
-  save-model-file: data/extract/giga-model.ckpt
+  save-model-file: data/result/giga-model.ckpt
   save-model-per-epoch:

@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as f
 
 from main.encoder import Encoder
+from main.reduce_encoder import ReduceEncoder
 from main.decoder import Decoder
 from main.encoder_attention import EncoderAttention
 from main.decoder_attention import DecoderAttention
@@ -15,10 +16,11 @@ class Seq2Seq(nn.Module):
         super(Seq2Seq, self).__init__()
 
         self.emb_size               = conf.get('emb-size')
-        self.hidden_size            = conf.get('hidden-size')
+        self.enc_hidden_size        = conf.get('enc-hidden-size')
+        self.dec_hidden_size        = conf.get('dec-hidden-size')
         self.vocab_size             = conf.get('vocab-size')
         self.max_dec_steps          = conf.get('max-dec-steps')
-        self.sharing_decoder_weight = conf.get('sharing-decoder-weight')
+        self.share_dec_weight       = conf.get('share-dec-weight')
 
         self.vocab = vocab
 
@@ -26,27 +28,30 @@ class Seq2Seq(nn.Module):
         if self.embedding is None:
             self.embedding = nn.Embedding(self.vocab.size(), self.emb_size, padding_idx=TK_PADDING['id'])
 
-        self.encoder = Encoder()
-        self.decoder = Decoder()
+        self.encoder        = Encoder()
+        self.reduce_encoder = ReduceEncoder()
+        self.decoder        = Decoder()
 
         self.enc_att = EncoderAttention()
         self.dec_att = DecoderAttention()
 
-        self.ptr_gen = nn.Linear(6 * self.hidden_size, 1)
+        combined_hidden_size = self.dec_hidden_size + 2 * self.enc_hidden_size + self.dec_hidden_size
+
+        self.ptr_gen = nn.Linear(combined_hidden_size, 1)
 
         # sharing decoder weight
-        if self.sharing_decoder_weight is True:
-            projection_layer = nn.Linear(6 * self.hidden_size, self.emb_size)
+        if self.share_dec_weight is True:
+            proj_layer = nn.Linear(combined_hidden_size, self.emb_size)
 
             output_layer = nn.Linear(self.emb_size, self.vocab_size)
             output_layer.weight = self.embedding.weight     # sharing weight with embedding
 
             self.vocab_gen = nn.Sequential(
-                projection_layer,
+                proj_layer,
                 output_layer
             )
         else:
-            self.vocab_gen = nn.Linear(6 * self.hidden_size, self.vocab.size())
+            self.vocab_gen = nn.Linear(combined_hidden_size, self.vocab.size())
 
     '''
             :params
@@ -56,28 +61,30 @@ class Seq2Seq(nn.Module):
                 max_oov_len      : C
 
             :returns
-                y                : B, M
+                y                : B, L
     '''
     def forward(self, x, x_len, extend_vocab_x, max_oov_len):
         batch_size = len(x)
 
         x = self.embedding(x)  # B, L, E
 
-        enc_outputs, (enc_hidden_n, enc_cell_n) = self.encoder(x, x_len)  # (B, L, 2H) , (B, 2H)
+        enc_outputs, (enc_hidden_n, enc_cell_n) = self.encoder(x, x_len)  # (B, L, 2EH) , (2, B, EH), (2, B, EH)
 
-        # initial decoder input = START_DECODING
+        enc_hidden_n, enc_cell_n = self.reduce_encoder(enc_hidden_n, enc_cell_n)
+
+        # initial decoder input = TK_START
         dec_input = cuda(t.tensor([TK_START['id']] * batch_size))  # B
 
         # initial decoder hidden = encoder last hidden
         dec_hidden = enc_hidden_n
 
         # initial decoder cell = encoder last cell
-        dec_cell = cuda(t.zeros(batch_size, 2 * self.hidden_size))
+        dec_cell = enc_cell_n
 
         # encoder temporal attention score
         enc_temporal_score = None   # B, L
 
-        pre_dec_hiddens = None  # B, T, 2H
+        pre_dec_hiddens = None  # B, T, DH
 
         y = None  # B, L
 
@@ -124,10 +131,10 @@ class Seq2Seq(nn.Module):
     '''
         :params
             dec_input               :   B
-            dec_hidden              :   B, 2H
-            dec_cell                :   B, 2H
-            pre_dec_hiddens         :   B, T, 2H
-            enc_hiddens             :   B, L, 2H
+            dec_hidden              :   B, DH
+            dec_cell                :   B, DH
+            pre_dec_hiddens         :   B, T, DH
+            enc_hiddens             :   B, L, EH
             enc_padding_mask        :   B, L
             enc_temporal_score      :   B, L
             extend_vocab_x          :   B, V + OOV
@@ -135,9 +142,9 @@ class Seq2Seq(nn.Module):
             
         :returns
             vocab_dist          :   B, V + OOV
-            dec_hidden          :   B, 2H
-            enc_ctx_vector      :   B, 2H
-            dec_ctx_vector      :   B, 2H
+            dec_hidden          :   B, DH
+            enc_ctx_vector      :   B, EH
+            dec_ctx_vector      :   B, DH
             enc_temporal_score  :   B, L
     '''
     def decode(self, dec_input,
@@ -154,7 +161,7 @@ class Seq2Seq(nn.Module):
         dec_input = self.embedding(dec_input)   # B, E
 
         # current hidden & cell
-        dec_hidden, dec_cell = self.decoder(dec_input, dec_hidden if pre_dec_hiddens is None else pre_dec_hiddens[:, -1, :], dec_cell)  # B, 2H
+        dec_hidden, dec_cell = self.decoder(dec_input, dec_hidden, dec_cell)  # B, 2H
 
         # intra-temporal encoder attention
 
