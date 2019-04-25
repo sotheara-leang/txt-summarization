@@ -7,11 +7,11 @@ from main.conf.configuration import Configuration
 conf = Configuration()
 
 #
+device = t.device('cuda' if t.cuda.is_available() else 'cpu')
 
-def cuda(tensor):
-    if t.cuda.is_available():
-        tensor = tensor.cuda()
-    return tensor
+
+def cuda(tensor, device_=None):
+    return tensor.to(device_ if device_ is not None else device)
 
 
 def getLogger(self):

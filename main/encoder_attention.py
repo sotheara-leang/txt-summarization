@@ -8,31 +8,31 @@ class EncoderAttention(nn.Module):
     def __init__(self):
         super(EncoderAttention, self).__init__()
 
-        self.attn = nn.Bilinear(conf.get('dec-hidden-size'), 2 * conf.get('enc-hidden-size'), 1, False)
+        self.attn = nn.Linear(2 * conf.get('enc-hidden-size'), conf.get('dec-hidden-size'), False)
 
     '''
         :params
             dec_hidden          : B, DH
             enc_hiddens         : B, L, EH
-            enc_temporal_score  : B, L
             enc_padding_mask    : B, L
-        
+            enc_temporal_score  : B, L
+
         :returns
             ctx_vector          : B, EH
-            att_dist            : B, L
+            attention           : B, L
             enc_temporal_score  : B, L
     '''
-    def forward(self, dec_hidden, enc_hiddens, enc_padding_mask, enc_temporal_score):
-        dec_hidden = dec_hidden.unsqueeze(1).expand(-1, enc_hiddens.size(1), -1).contiguous()  # B, L, DH
 
-        score = self.attn(dec_hidden, enc_hiddens).squeeze(2)   # B, L
+    def forward(self, dec_hidden, enc_hiddens, enc_padding_mask, enc_temporal_score):
+        score = t.bmm(self.attn(enc_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, L, DH) *  (B, DH, 1) => (B, L)
 
         # temporal normalization
 
-        exp_score = t.exp(score)    # B, L
+        exp_score = t.exp(score)
+
         if enc_temporal_score is None:
             score = exp_score
-            enc_temporal_score = exp_score
+            enc_temporal_score = exp_score + 1e-10
         else:
             score = exp_score / enc_temporal_score
             enc_temporal_score = enc_temporal_score + exp_score
@@ -43,12 +43,10 @@ class EncoderAttention(nn.Module):
 
         # normalization
 
-        normalization_factor = score.sum(1, keepdim=True)   # B, L
-        attention = score / normalization_factor  # B, L
+        attention = score / (t.sum(score, dim=1).unsqueeze(1) + 1e-10)  # B, L
 
         # context vector
 
-        ctx_vector = t.bmm(attention.unsqueeze(1), enc_hiddens)  # (B, 1, L) * (B, L, EH)  =>  B, 1, EH
-        ctx_vector = ctx_vector.squeeze(1)  # B, EH
+        ctx_vector = t.bmm(attention.unsqueeze(1), enc_hiddens).squeeze(1)  # (B, 1, L) * (B, L, EH)  =>  B, EH
 
         return ctx_vector, attention, enc_temporal_score

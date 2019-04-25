@@ -31,10 +31,11 @@ class Batch(object):
 
 class BatchInitializer(object):
 
-    def __init__(self, vocab, max_enc_steps, max_dec_steps):
+    def __init__(self, vocab, max_enc_steps, max_dec_steps, pointer_generator):
         self.vocab = vocab
         self.max_enc_steps = max_enc_steps
         self.max_dec_steps = max_dec_steps
+        self.pointer_generator = pointer_generator
 
     def init(self, samples):
         articles, summaries = list(zip(*samples))
@@ -60,9 +61,14 @@ class BatchInitializer(object):
 
             enc_article += [TK_PADDING['id']] * (max_article_len - len(enc_article))
 
-            enc_extend_vocab_article, article_oovs = self.vocab.extend_words2ids(article_words)
-            enc_extend_vocab_article += [TK_STOP['id']]
-            enc_extend_vocab_article += [TK_PADDING['id']] * (max_article_len - len(enc_extend_vocab_article))
+            if self.pointer_generator is True:
+                enc_extend_vocab_article, article_oovs = self.vocab.extend_words2ids(article_words)
+
+                enc_extend_vocab_article += [TK_STOP['id']]
+                enc_extend_vocab_article += [TK_PADDING['id']] * (max_article_len - len(enc_extend_vocab_article))
+            else:
+                enc_extend_vocab_article = enc_article
+                article_oovs = []
 
             enc_articles.append(enc_article)
             enc_articles_padding_mask.append(enc_article_padding_mask)

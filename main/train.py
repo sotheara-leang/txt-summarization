@@ -1,19 +1,17 @@
 from rouge import Rouge
 import torch.nn as nn
+from torch import autograd
 from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
 import os
 import time
 import datetime
-import math
 
 from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
 from main.common.batch import *
 from main.common.util.file_util import FileUtil
-from main.common.glove.vocab import GloveVocab
 from main.common.simple_vocab import SimpleVocab
-from main.common.glove.embedding import GloveEmbedding
 
 
 class Train(object):
@@ -47,18 +45,16 @@ class Train(object):
         self.tb_log_dir                 = conf.get('train:tb-log-dir')
 
         self.save_model_per_epoch       = conf.get('train:save-model-per-epoch')
+        self.pointer_generator          = conf.get('pointer-generator')
+
 
         self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
-        #self.vocab = GloveVocab(FileUtil.get_file_path(conf.get('vocab-file')))
 
         self.seq2seq = cuda(Seq2Seq(self.vocab))
 
-        #self.seq2seq = cuda(Seq2Seq(self.vocab, GloveEmbedding(FileUtil.get_file_path(conf.get('emb-file')))))
+        self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps, self.pointer_generator)
 
-        self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps)
-
-        self.data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
-                                               FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
+        self.data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')), FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
 
         self.optimizer = t.optim.Adam(self.seq2seq.parameters(), lr=self.lr)
 
@@ -76,11 +72,11 @@ class Train(object):
 
         ## encoding input
 
-        x = self.seq2seq.embedding(batch.articles)  # B, L, E
+        x = self.seq2seq.embedding(batch.articles)
 
-        enc_outputs, (enc_hidden, enc_cell_n) = self.seq2seq.encoder(x, batch.articles_len)  # (B, L, 2EH), (2, B, EH), (2, B, EH)
+        enc_outputs, (enc_hidden, enc_cell_n) = self.seq2seq.encoder(x, batch.articles_len)
 
-        enc_hidden, enc_cell = self.seq2seq.reduce_encoder(enc_hidden, enc_cell_n) # (B, DH), (B, DH)
+        enc_hidden, enc_cell = self.seq2seq.reduce_encoder(enc_hidden, enc_cell_n)
 
         ## ML
 
@@ -162,17 +158,17 @@ class Train(object):
         return loss, ml_loss, rl_loss, reward, rl_enable, time_spent
 
     def train_ml(self, enc_outputs, dec_hidden, dec_cell, batch, epoch_counter):
-        y                       = None  # B, T
-        loss                    = None  # B, T
-        enc_temporal_score      = None  # B, L
-        pre_dec_hiddens         = None  # B, T, DH
-        stop_decoding_mask      = cuda(t.zeros(batch.size))         # B
-        extend_vocab_articles   = batch.extend_vocab_articles       # B, L
-        articles_padding_mask   = batch.articles_padding_mask       # B, L
-        target_y                = batch.summaries
-        max_dec_len             = max(batch.summaries_len)
-        max_ovv_len             = max([len(oov) for oov in batch.oovs])
-        dec_input               = batch.summaries[:, 0]
+        y = None  # B, T
+        loss = None  # B, T
+        enc_temporal_score = None  # B, L
+        pre_dec_hiddens = None  # B, T, DH
+        stop_decoding_mask = cuda(t.zeros(batch.size))  # B
+        extend_vocab_articles = batch.extend_vocab_articles  # B, L
+        articles_padding_mask = batch.articles_padding_mask  # B, L
+        target_y = batch.summaries
+        max_dec_len = max(batch.summaries_len)
+        max_ovv_len = max([len(oov) for oov in batch.oovs])
+        dec_input = batch.summaries[:, 0]
 
         for i in range(max_dec_len - 1):
             ## decoding
@@ -189,34 +185,21 @@ class Train(object):
 
             ## loss
 
-            step_loss = self.criterion(t.log(vocab_dist + 1e-20), target_y[:, i + 1])  # B
-
-            for v in step_loss:
-                if math.isnan(v) or math.isinf(v):
-                    print('>>>> step_loss', step_loss)
-                    return
+            step_loss = self.criterion(t.log(vocab_dist + 1e-12), target_y[:, i + 1])  # B
 
             loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)  # B, L
 
             ## output
 
-            dec_output = t.multinomial(vocab_dist, 1).squeeze()
+            _, dec_output = t.max(vocab_dist, dim=1)
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
-
-            ## masking decoding
-
-            stop_decoding_mask[(stop_decoding_mask == 0) + (dec_output == TK_STOP['id']) == 2] = 1
-
-            if len(stop_decoding_mask[stop_decoding_mask == 1]) == len(stop_decoding_mask):
-                break
 
             ## teacher forcing
 
             forcing_ratio = max(0, self.ml_forcing_ratio - self.ml_forcing_decay * epoch_counter)
 
-            use_ground_truth = t.rand(batch.size) < forcing_ratio  # B
-            use_ground_truth = cuda(use_ground_truth.long())
+            use_ground_truth = cuda((t.rand(batch.size) < forcing_ratio).long())  # B
 
             dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output  # B
 
@@ -226,20 +209,21 @@ class Train(object):
 
             dec_input = (1 - is_oov) * dec_input + is_oov * TK_UNKNOWN['id']
 
-            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat([pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
+            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat(
+                [pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
 
         return y, loss
 
     def train_rl(self, enc_outputs, dec_hidden, dec_cell, batch, sampling):
-        y                       = None  # B, T
-        loss                    = None  # B, T
-        enc_temporal_score      = None  # B, L
-        pre_dec_hiddens         = None  # B, T, DH
-        stop_decoding_mask      = cuda(t.zeros(batch.size))         # B
-        articles_padding_mask   = batch.articles_padding_mask       # B, L
-        extend_vocab_articles   = batch.extend_vocab_articles       # B, L
-        max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
-        dec_input               = batch.summaries[:, 0]
+        y = None  # B, T
+        loss = None  # B, T
+        enc_temporal_score = None  # B, L
+        pre_dec_hiddens = None  # B, T, DH
+        stop_decoding_mask = cuda(t.zeros(batch.size))  # B
+        articles_padding_mask = batch.articles_padding_mask  # B, L
+        extend_vocab_articles = batch.extend_vocab_articles  # B, L
+        max_ovv_len = max([len(vocab) for vocab in batch.oovs])
+        dec_input = batch.summaries[:, 0]
 
         for i in range(self.max_dec_steps):
             ## decoding
@@ -270,9 +254,9 @@ class Train(object):
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
-            ## masking decoding
+            ## stop decoding mask
 
-            stop_decoding_mask[(stop_decoding_mask == 0) + (dec_output == TK_STOP['id']) == 2] = 1
+            stop_decoding_mask[dec_output == TK_STOP['id']] = 1
 
             if len(stop_decoding_mask[stop_decoding_mask == 1]) == len(stop_decoding_mask):
                 break
@@ -285,7 +269,8 @@ class Train(object):
 
             dec_input = (1 - is_oov) * dec_input + is_oov * TK_UNKNOWN['id']
 
-            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat([pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
+            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat(
+                [pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
 
         return y, loss
 
@@ -295,21 +280,21 @@ class Train(object):
         self.logger.debug('>>> training:')
 
         total_batch_counter = 0
-        train_time      = time.time()
+        train_time = time.time()
 
         criterion_scheduler = t.optim.lr_scheduler.StepLR(self.optimizer, self.lr_decay_epoch, self.lr_decay)
 
         for i in range(self.epoch):
             self.logger.debug('========================= epoch %i/%i =========================', i + 1, self.epoch)
 
-            batch_counter       = 0
+            batch_counter = 0
 
-            total_loss          = 0
-            total_ml_loss       = 0
-            total_rl_loss       = 0
+            total_loss = 0
+            total_ml_loss = 0
+            total_rl_loss = 0
             total_samples_award = 0
 
-            epoch_time_spent    = 0
+            epoch_time_spent = 0
 
             criterion_scheduler.step()
 
@@ -324,7 +309,7 @@ class Train(object):
                 batch = self.batch_initializer.init(batch)
 
                 # feed batch to model
-                loss, ml_loss, rl_loss, samples_reward, enable_rl, time_spent = self.train_batch(batch, i+1)
+                loss, ml_loss, rl_loss, samples_reward, enable_rl, time_spent = self.train_batch(batch, i + 1)
 
                 epoch_time_spent += time_spent
 
@@ -332,18 +317,22 @@ class Train(object):
 
                     if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
                         if enable_rl:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s', i + 1, batch_counter + 1,
-                                         loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))
+                            self.logger.debug(
+                                'EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s',
+                                i + 1, batch_counter + 1,
+                                loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))
                         else:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s', i + 1,
-                                              batch_counter + 1, loss, ml_loss, str(datetime.timedelta(seconds=time_spent)))
+                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s',
+                                              i + 1,
+                                              batch_counter + 1, loss, ml_loss,
+                                              str(datetime.timedelta(seconds=time_spent)))
 
-                total_loss          += loss
-                total_ml_loss       += ml_loss
-                total_rl_loss       += rl_loss
+                total_loss += loss
+                total_ml_loss += ml_loss
+                total_rl_loss += rl_loss
                 total_samples_award += samples_reward
 
-                batch_counter       += 1
+                batch_counter += 1
                 total_batch_counter += 1
 
             epoch_loss = total_loss / batch_counter
@@ -370,7 +359,8 @@ class Train(object):
             self.data_loader.reset()
 
             # save model per epoch
-            if i == self.epoch - 1 or (self.save_model_per_epoch is not None and (i + 1) % self.save_model_per_epoch == 0):
+            if i == self.epoch - 1 or (
+                    self.save_model_per_epoch is not None and (i + 1) % self.save_model_per_epoch == 0):
                 self.save_model({'epoch': i, 'loss': epoch_loss}, i != self.epoch - 1)
 
         train_time = time.time() - train_time
@@ -469,7 +459,8 @@ class Train(object):
         self.load_model()
 
         # train
-        self.train()
+        with autograd.detect_anomaly():
+            self.train()
 
         # evaluate
         self.evaluate()

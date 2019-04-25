@@ -12,7 +12,8 @@ vocab-file: data/extract/giga-vocab.txt
 
 model-file: data/extract/giga-model.ckpt
 
-share-dec-weight: true
+pointer-generator: false
+share-dec-weight: false
 
 train:
   epoch: 1
