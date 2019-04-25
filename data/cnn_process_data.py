@@ -3,6 +3,7 @@ import os
 import collections
 import tqdm
 import string
+import re
 
 ptb_unescape = {'-lrb-': '(', '-rrb-': ')', '-lcb-': '{', '-rcb-': '}', '<t>': '', '</t>': ''}
 
