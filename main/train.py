@@ -158,17 +158,16 @@ class Train(object):
         return loss, ml_loss, rl_loss, reward, rl_enable, time_spent
 
     def train_ml(self, enc_outputs, dec_hidden, dec_cell, batch, epoch_counter):
-        y = None  # B, T
-        loss = None  # B, T
-        enc_temporal_score = None  # B, L
-        pre_dec_hiddens = None  # B, T, DH
-        stop_decoding_mask = cuda(t.zeros(batch.size))  # B
-        extend_vocab_articles = batch.extend_vocab_articles  # B, L
-        articles_padding_mask = batch.articles_padding_mask  # B, L
-        target_y = batch.summaries
-        max_dec_len = max(batch.summaries_len)
-        max_ovv_len = max([len(oov) for oov in batch.oovs])
-        dec_input = batch.summaries[:, 0]
+        y                       = None
+        loss                    = None
+        enc_temporal_score      = None
+        pre_dec_hiddens         = None
+        extend_vocab_x          = batch.extend_vocab_articles
+        enc_padding_mask        = batch.articles_padding_mask
+        target_y                = batch.summaries
+        max_dec_len             = max(batch.summaries_len)
+        max_ovv_len             = max([len(oov) for oov in batch.oovs])
+        dec_input               = batch.summaries[:, 0]
 
         for i in range(max_dec_len - 1):
             ## decoding
@@ -178,9 +177,9 @@ class Train(object):
                 dec_cell,
                 pre_dec_hiddens,
                 enc_outputs,
-                articles_padding_mask,
+                enc_padding_mask,
                 enc_temporal_score,
-                extend_vocab_articles,
+                extend_vocab_x,
                 max_ovv_len)
 
             ## loss
@@ -199,9 +198,9 @@ class Train(object):
 
             forcing_ratio = max(0, self.ml_forcing_ratio - self.ml_forcing_decay * epoch_counter)
 
-            use_ground_truth = cuda((t.rand(batch.size) < forcing_ratio).long())  # B
+            use_ground_truth = cuda((t.rand(batch.size) < forcing_ratio).long())
 
-            dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output  # B
+            dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output
 
             ## if next decoder input is oov, change it to TK_UNKNOWN
 
@@ -209,21 +208,20 @@ class Train(object):
 
             dec_input = (1 - is_oov) * dec_input + is_oov * TK_UNKNOWN['id']
 
-            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat(
-                [pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
+            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat([pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
 
         return y, loss
 
     def train_rl(self, enc_outputs, dec_hidden, dec_cell, batch, sampling):
-        y = None  # B, T
-        loss = None  # B, T
-        enc_temporal_score = None  # B, L
-        pre_dec_hiddens = None  # B, T, DH
-        stop_decoding_mask = cuda(t.zeros(batch.size))  # B
-        articles_padding_mask = batch.articles_padding_mask  # B, L
-        extend_vocab_articles = batch.extend_vocab_articles  # B, L
-        max_ovv_len = max([len(vocab) for vocab in batch.oovs])
-        dec_input = batch.summaries[:, 0]
+        y                       = None
+        loss                    = None
+        enc_temporal_score      = None
+        pre_dec_hiddens         = None
+        stop_decoding_mask      = cuda(t.zeros(batch.size))
+        enc_padding_mask        = batch.articles_padding_mask
+        extend_vocab_x          = batch.extend_vocab_articles
+        max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
+        dec_input               = batch.summaries[:, 0]
 
         for i in range(self.max_dec_steps):
             ## decoding
@@ -233,9 +231,9 @@ class Train(object):
                 dec_cell,
                 pre_dec_hiddens,
                 enc_outputs,
-                articles_padding_mask,
+                enc_padding_mask,
                 enc_temporal_score,
-                extend_vocab_articles,
+                extend_vocab_x,
                 max_ovv_len)
 
             ## sampling
@@ -245,7 +243,7 @@ class Train(object):
 
                 step_loss = sampling_dist.log_prob(dec_output)
 
-                loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)  # B, L
+                loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)
             else:
                 ## greedy search
                 _, dec_output = t.max(vocab_dist, dim=1)
@@ -269,8 +267,7 @@ class Train(object):
 
             dec_input = (1 - is_oov) * dec_input + is_oov * TK_UNKNOWN['id']
 
-            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat(
-                [pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
+            pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat([pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
 
         return y, loss
 
@@ -317,15 +314,11 @@ class Train(object):
 
                     if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
                         if enable_rl:
-                            self.logger.debug(
-                                'EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s',
-                                i + 1, batch_counter + 1,
+                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s', i + 1, batch_counter + 1,
                                 loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))
                         else:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s',
-                                              i + 1,
-                                              batch_counter + 1, loss, ml_loss,
-                                              str(datetime.timedelta(seconds=time_spent)))
+                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s', i + 1, batch_counter + 1,
+                                              loss, ml_loss, str(datetime.timedelta(seconds=time_spent)))
 
                 total_loss += loss
                 total_ml_loss += ml_loss
@@ -359,11 +352,11 @@ class Train(object):
             self.data_loader.reset()
 
             # save model per epoch
-            if i == self.epoch - 1 or (
-                    self.save_model_per_epoch is not None and (i + 1) % self.save_model_per_epoch == 0):
+            if i == self.epoch - 1 or (self.save_model_per_epoch is not None and (i + 1) % self.save_model_per_epoch == 0):
                 self.save_model({'epoch': i, 'loss': epoch_loss}, i != self.epoch - 1)
 
         train_time = time.time() - train_time
+
         self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=train_time)))
 
     def evaluate(self):

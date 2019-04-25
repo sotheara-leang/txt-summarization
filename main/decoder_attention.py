@@ -26,9 +26,7 @@ class DecoderAttention(nn.Module):
             ctx_vector = cuda(t.zeros(dec_hidden.size()))
             attention = cuda(t.zeros(dec_hidden.size()))
         else:
-            score = t.bmm(self.attn(pre_dec_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, T, DH) *  (B, DH, 1) => (B, L)
-
-            # softmax
+            score = t.bmm(self.attn(pre_dec_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, T, DH) *  (B, DH, 1) => (B, T)
 
             attention = f.softmax(score, dim=1)  # B, T
 
