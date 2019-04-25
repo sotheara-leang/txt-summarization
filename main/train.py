@@ -346,7 +346,7 @@ class Train(object):
             else:
                 self.logger.debug('rl-loss_avg\t=\tNA')
 
-            self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
+            self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
 
             # reload data set
             self.data_loader.reset()
@@ -368,9 +368,9 @@ class Train(object):
 
         self.seq2seq.eval()
 
-        rouge = Rouge()
-        scores = []
-        eval_time = time.time()
+        rouge           = Rouge()
+        total_scores    = []
+        eval_time       = time.time()
 
         while True:
             batch = self.data_loader.next_batch()
@@ -378,23 +378,34 @@ class Train(object):
             if batch is None:
                 break
 
-            for sample in batch:
-                article = sample[0]
-                ref_summary = sample[1]
+            batch = self.batch_initializer.init(batch)
 
-                gen_summary = self.seq2seq.summarize(article)
+            max_ovv_len = max([len(oov) for oov in batch.oovs])
 
-                rouge_score = rouge.get_scores(gen_summary, ref_summary)[0]
+            # prediction
 
-                scores.append(rouge_score["rouge-l"]["f"])
+            output = self.seq2seq(batch.articles, batch.articles_len, batch.extend_vocab_articles, max_ovv_len)
 
-        avg_score = sum(scores) / len(scores)
+            gen_summaries = []
+            for idx, summary in enumerate(output.tolist()):
+                gen_summaries.append(' '.join(self.vocab.ids2words(summary, batch.oovs[idx])))
+
+            reference_summaries = batch.original_summaries
+
+            # calculate rouge score
+
+            scores = rouge.get_scores(list(gen_summaries), list(reference_summaries))
+            scores = [score["rouge-l"]["f"] for score in scores]
+
+            total_scores += scores
+
+        avg_score = sum(total_scores) / len(total_scores)
 
         eval_time = time.time() - eval_time
 
-        self.logger.debug('examples: %d', len(scores))
+        self.logger.debug('examples: %d', len(total_scores))
         self.logger.debug('avg rouge-l score: %.3f', avg_score)
-        self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=eval_time)))
+        self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=eval_time)))
 
     def load_model(self):
         model_file = conf.get('train:load-model-file')

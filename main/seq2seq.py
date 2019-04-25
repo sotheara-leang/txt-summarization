@@ -102,7 +102,7 @@ class Seq2Seq(nn.Module):
 
         for i in range(self.max_dec_steps):
             # decoding
-            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, _, enc_temporal_score = self.decode(
+            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, _ = self.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,
