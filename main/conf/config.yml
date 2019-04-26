@@ -46,3 +46,11 @@ train:
   load-model-file:
   save-model-file: data/result/giga-model.ckpt
   save-model-per-epoch:
+
+eval:
+  batch-size: 20
+  log-batch: true
+  log-batch-interval: 2
+
+  article-file: data/extract/giga-article.txt
+  summary-file: data/extract/giga-summary.txt

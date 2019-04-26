@@ -190,7 +190,7 @@ class Train(object):
 
             ## output
 
-            _, dec_output = t.max(vocab_dist, dim=1)
+            dec_output = t.multinomial(vocab_dist, 1).squeeze()
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
