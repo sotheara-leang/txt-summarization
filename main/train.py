@@ -19,6 +19,7 @@ class Train(object):
     def __init__(self):
         self.logger                     = getLogger(self)
 
+        self.enc_hidden_size            = conf.get('enc-hidden-size')
         self.dec_hidden_size            = conf.get('dec-hidden-size')
 
         self.max_enc_steps              = conf.get('max-enc-steps')
@@ -66,22 +67,23 @@ class Train(object):
     def train_batch(self, batch, epoch_counter):
         start_time = time.time()
 
-        self.optimizer.zero_grad()
-
         rouge = Rouge()
 
         ## encoding input
 
         x = self.seq2seq.embedding(batch.articles)
 
-        enc_outputs, (enc_hidden, enc_cell_n) = self.seq2seq.encoder(x, batch.articles_len)
+        enc_outputs, (enc_hidden_n, enc_cell_n) = self.seq2seq.encoder(x, batch.articles_len)
 
-        enc_hidden, enc_cell = self.seq2seq.reduce_encoder(enc_hidden, enc_cell_n)
+        enc_hidden_n, enc_cell_n = self.seq2seq.reduce_encoder(enc_hidden_n, enc_cell_n)
+
+        dec_hidden = enc_hidden_n
+        dec_cell = cuda(t.zeros(batch.size, self.dec_hidden_size))
 
         ## ML
 
         if self.ml_enable:
-            output = self.train_ml(enc_outputs, enc_hidden, enc_cell, batch, epoch_counter)
+            output = self.train_ml(enc_outputs, dec_hidden, dec_cell, batch, epoch_counter)
 
             ml_loss = t.sum(output[1], dim=1) / batch.summaries_len.float()
             ml_loss = t.mean(ml_loss)
@@ -99,11 +101,11 @@ class Train(object):
 
         if rl_enable:
             # sampling
-            sampling_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, batch, True)
+            sampling_output = self.train_rl(enc_outputs, dec_hidden, dec_cell, batch, True)
 
             # greedy search
             with t.autograd.no_grad():
-                baseline_output = self.train_rl(enc_outputs, enc_hidden, enc_cell, batch, False)
+                baseline_output = self.train_rl(enc_outputs, dec_hidden, dec_cell, batch, False)
 
             # convert decoded output to string
 
@@ -147,6 +149,8 @@ class Train(object):
 
         loss = rl_weight * rl_loss + (1 - rl_weight) * ml_loss
 
+        self.optimizer.zero_grad()
+
         loss.backward()
 
         nn.utils.clip_grad_norm_(self.seq2seq.parameters(), self.clip_gradient_max_norm)
@@ -168,10 +172,11 @@ class Train(object):
         max_dec_len             = max(batch.summaries_len)
         max_ovv_len             = max([len(oov) for oov in batch.oovs])
         dec_input               = batch.summaries[:, 0]
+        enc_ctx_vector          = t.zeros(batch.size, 2 * self.enc_hidden_size)
 
         for i in range(max_dec_len - 1):
             ## decoding
-            vocab_dist, dec_hidden, dec_cell, _, enc_temporal_score, _ = self.seq2seq.decode(
+            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, _ = self.seq2seq.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,
@@ -179,18 +184,19 @@ class Train(object):
                 enc_outputs,
                 enc_padding_mask,
                 enc_temporal_score,
+                enc_ctx_vector,
                 extend_vocab_x,
                 max_ovv_len)
 
             ## loss
 
-            step_loss = self.criterion(t.log(vocab_dist + 1e-12), target_y[:, i + 1])  # B
+            step_loss = self.criterion(t.log(vocab_dist + 1e-20), target_y[:, i + 1])
 
-            loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)  # B, L
+            loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)
 
             ## output
 
-            dec_output = t.multinomial(vocab_dist, 1).squeeze()
+            dec_output = t.multinomial(vocab_dist, 1).squeeze().detach()
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
@@ -222,6 +228,7 @@ class Train(object):
         extend_vocab_x          = batch.extend_vocab_articles
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
         dec_input               = batch.summaries[:, 0]
+        enc_ctx_vector          = t.zeros(batch.size, 2 * self.enc_hidden_size)
 
         for i in range(self.max_dec_steps):
             ## decoding
@@ -233,6 +240,7 @@ class Train(object):
                 enc_outputs,
                 enc_padding_mask,
                 enc_temporal_score,
+                enc_ctx_vector,
                 extend_vocab_x,
                 max_ovv_len)
 
@@ -249,6 +257,8 @@ class Train(object):
                 _, dec_output = t.max(vocab_dist, dim=1)
 
             ## output
+
+            dec_output = dec_output.detach()
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
@@ -459,7 +469,7 @@ class Train(object):
         # display configuration
         self.logger.debug('>>> configuration: \n' + conf.dump().strip())
 
-        # load pre-trained model`
+        # load pre-trained model
         self.load_model()
 
         # train

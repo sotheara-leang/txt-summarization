@@ -10,6 +10,8 @@ class Decoder(nn.Module):
 
         self.lstm = nn.LSTMCell(conf.get('emb-size'), conf.get('dec-hidden-size'))
 
+        self.y_concat = nn.Linear(2 * conf.get('enc-hidden-size') + conf.get('emb-size'), conf.get('emb-size'))
+
     '''
         :params
             y               : B, E
@@ -20,6 +22,9 @@ class Decoder(nn.Module):
             hidden          : B, DH
             cell            : B, DH   
     '''
-    def forward(self, y, pre_hidden, pre_cell):
+    def forward(self, y, pre_hidden, pre_cell, enc_ctx_vector):
+        y = self.y_concat(t.cat([y, enc_ctx_vector], dim=1))
+
         hidden, cell = self.lstm(y, (pre_hidden, pre_cell))
+
         return hidden, cell

@@ -53,7 +53,7 @@ class Seq2Seq(nn.Module):
                 output_layer
             )
         else:
-            self.vocab_gen = nn.Linear(combined_hidden_size, self.vocab.size())
+            self.vocab_gen = nn.Linear(combined_hidden_size, self.vocab_size)
 
     '''
             :params
@@ -79,26 +79,28 @@ class Seq2Seq(nn.Module):
         dec_hidden = enc_hidden_n
 
         # initial decoder cell
-        dec_cell = enc_cell_n
+        dec_cell = cuda(t.zeros(batch_size, self.dec_hidden_size))
 
         # initial decoder input
-        dec_input = cuda(t.tensor([TK_START['id']] * batch_size))  # B
+        dec_input = cuda(t.tensor([TK_START['id']] * batch_size))
 
         # encoder padding mask
-        enc_padding_mask = t.zeros(batch_size, max(x_len))
+        enc_padding_mask = t.ones(batch_size, max(x_len))
         for i in range(batch_size):
-            enc_padding_mask[i, :x_len[i]] = t.ones(1, x_len[i])
+            enc_padding_mask[i, :x_len[i]] = t.zeros(1, x_len[i])
 
-        enc_padding_mask = cuda(enc_padding_mask)
+        enc_padding_mask = cuda(enc_padding_mask.byte())
 
         # stop decoding mask
         stop_dec_mask = cuda(t.zeros(len(x)))
+
+        enc_ctx_vector = t.zeros(batch_size, 2 * self.enc_hidden_size)
 
         enc_temporal_score = None
 
         pre_dec_hiddens = None
 
-        y = None  # B, L
+        y = None
 
         for i in range(self.max_dec_steps):
             # decoding
@@ -110,6 +112,7 @@ class Seq2Seq(nn.Module):
                 enc_outputs,
                 enc_padding_mask,
                 enc_temporal_score,
+                enc_ctx_vector,
                 extend_vocab_x,
                 max_oov_len)
 
@@ -141,13 +144,14 @@ class Seq2Seq(nn.Module):
             enc_hiddens             :   B, L, EH
             enc_padding_mask        :   B, L
             enc_temporal_score      :   B, L
+            enc_ctx_vector          :   B, 2EH
             extend_vocab_x          :   B, L
             max_oov_len             :   C
 
         :returns
             vocab_dist              :   B, V + OOV
             dec_hidden              :   B, DH
-            enc_ctx_vector          :   B, EH
+            enc_ctx_vector          :   B, 2EH
             enc_temporal_score      :   B, L
             dec_ctx_vector          :   B, DH
     '''
@@ -159,12 +163,13 @@ class Seq2Seq(nn.Module):
                enc_hiddens,
                enc_padding_mask,
                enc_temporal_score,
+               enc_ctx_vector,
                extend_vocab_x,
                max_oov_len):
 
         dec_input = self.embedding(dec_input)
 
-        dec_hidden, dec_cell = self.decoder(dec_input, dec_hidden, dec_cell)
+        dec_hidden, dec_cell = self.decoder(dec_input, dec_hidden, dec_cell, enc_ctx_vector)
 
         # intra-temporal encoder attention
 
@@ -184,6 +189,7 @@ class Seq2Seq(nn.Module):
 
         if self.pointer_generator is True:
             ptr_prob = t.sigmoid(self.ptr_gen(combined_input))
+
             ptr_dist = ptr_prob * enc_att
 
             vocab_dist = (1 - ptr_prob) * vocab_dist

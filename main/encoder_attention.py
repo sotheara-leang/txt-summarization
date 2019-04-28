@@ -1,4 +1,6 @@
 import torch.nn as nn
+import torch.nn.functional as f
+import math
 
 from main.common.common import *
 
@@ -8,7 +10,7 @@ class EncoderAttention(nn.Module):
     def __init__(self):
         super(EncoderAttention, self).__init__()
 
-        self.attn = nn.Linear(2 * conf.get('enc-hidden-size'), conf.get('dec-hidden-size'), False)
+        self.w_attn = nn.Linear(2 * conf.get('enc-hidden-size'), conf.get('dec-hidden-size'), False)
 
     '''
         :params
@@ -24,26 +26,23 @@ class EncoderAttention(nn.Module):
     '''
 
     def forward(self, dec_hidden, enc_hiddens, enc_padding_mask, enc_temporal_score):
-        score = t.bmm(self.attn(enc_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, L, DH) *  (B, DH, 1) => (B, L)
+        score = t.bmm(self.w_attn(enc_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, L, DH) *  (B, DH, 1) => (B, L)
+
+        score = score.masked_fill_(enc_padding_mask, -float('inf'))
+
+        score = f.softmax(score, dim=1)
 
         # temporal normalization
 
-        exp_score = t.exp(score)
-
         if enc_temporal_score is None:
-            score = exp_score
-            enc_temporal_score = exp_score + 1e-10
+            enc_temporal_score = score
         else:
-            score = exp_score / enc_temporal_score
-            enc_temporal_score = enc_temporal_score + exp_score
-
-        # masking
-
-        score = score * enc_padding_mask.float()
+            score = score / (enc_temporal_score + 1e-10)
+            enc_temporal_score = enc_temporal_score + score
 
         # normalization
 
-        attention = score / (t.sum(score, dim=1).unsqueeze(1) + 1e-10)  # B, L
+        attention = score / (t.sum(score, dim=1).unsqueeze(1) + 1e-10)   # B, L
 
         # context vector
 

@@ -1,5 +1,5 @@
 import torch.nn as nn
-import torch.nn.utils.rnn as rnn
+import torch.nn.utils as utils
 
 from main.common.common import *
 
@@ -22,14 +22,11 @@ class Encoder(nn.Module):
             cell    : 2, B, EH
     '''
     def forward(self, x, x_len):
-        packed_x = rnn.pack_padded_sequence(x, x_len, batch_first=True)
+        packed_x = utils.rnn.pack_padded_sequence(x, x_len, batch_first=True)
 
-        # outputs   : B, L, 2H
-        # hidden    : 2, B, H
-        # cell      : 2, B, H
         outputs, (hidden, cell) = self.lstm(packed_x)
 
-        outputs, _ = rnn.pad_packed_sequence(outputs, batch_first=True)
+        outputs, _ = utils.rnn.pad_packed_sequence(outputs, batch_first=True)
         outputs = outputs.contiguous()
 
         return outputs, (hidden, cell)
