@@ -94,8 +94,8 @@ class Train(object):
 
         rl_enable = self.rl_enable
         if rl_enable:
-            if self.rl_transit_epoch >= 0:
-                rl_enable = epoch_counter == self.rl_transit_epoch
+            if self.rl_transit_epoch > 0:
+                rl_enable = epoch_counter >= self.rl_transit_epoch
             else:
                 rl_enable = max(0, 1 - self.rl_transit_decay * epoch_counter) == 0
 
@@ -133,7 +133,7 @@ class Train(object):
 
             sampling_loss = t.sum(sampling_output[1], dim=1) / t.sum(sampling_output[1] != 0, dim=1).float()
 
-            rl_loss = (baseline_scores - sampling_scores) * sampling_loss
+            rl_loss = (sampling_scores - baseline_scores) * sampling_loss
             rl_loss = t.mean(rl_loss)
 
             # reward
@@ -172,7 +172,7 @@ class Train(object):
         max_dec_len             = max(batch.summaries_len)
         max_ovv_len             = max([len(oov) for oov in batch.oovs])
         dec_input               = batch.summaries[:, 0]
-        enc_ctx_vector          = t.zeros(batch.size, 2 * self.enc_hidden_size)
+        enc_ctx_vector          = cuda(t.zeros(batch.size, 2 * self.enc_hidden_size))
 
         for i in range(max_dec_len - 1):
             ## decoding
@@ -228,7 +228,7 @@ class Train(object):
         extend_vocab_x          = batch.extend_vocab_articles
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
         dec_input               = batch.summaries[:, 0]
-        enc_ctx_vector          = t.zeros(batch.size, 2 * self.enc_hidden_size)
+        enc_ctx_vector          = cuda(t.zeros(batch.size, 2 * self.enc_hidden_size))
 
         for i in range(self.max_dec_steps):
             ## decoding
@@ -454,7 +454,7 @@ class Train(object):
         if save_epoch is True:
             dot = model_file.rfind('.')
             if dot != -1:
-                model_file = model_file[:dot] + '-' + str(args['epoch']) + model_file[dot:]
+                model_file = model_file[:dot] + '-' + str(args['epoch'] + 1) + model_file[dot:]
 
         self.logger.debug('>>> save model into: ' + model_file)
 

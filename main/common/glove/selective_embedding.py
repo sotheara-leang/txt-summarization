@@ -4,11 +4,9 @@ import numpy as np
 from main.common.vocab import *
 
 
-class GloveSelectiveEmbedding(nn.Module):
+class GloveSelectiveEmbedding(nn.Embedding):
 
     def __init__(self, emb_file, vocab):
-        super(GloveSelectiveEmbedding, self).__init__()
-
         word2id, id2word, id2vect = self.load_emb_file(emb_file, vocab)
 
         vectors = np.asarray(list(id2vect.values()))
@@ -25,8 +23,8 @@ class GloveSelectiveEmbedding(nn.Module):
         vectors = np.concatenate((default_vectors, vectors), axis=0)
         n_vocab, vocab_dim = vectors.shape
 
-        self.embedding = nn.Embedding(n_vocab, vocab_dim, padding_idx=0)
-        self.embedding.from_pretrained(t.tensor(vectors))
+        super(GloveSelectiveEmbedding, self).__init__(num_embeddings=n_vocab,
+                                                      embedding_dim=vocab_dim, padding_idx=0, _weight=t.FloatTensor(vectors))
 
     def load_emb_file(self, emb_file, vocab):
         word2id = {}
@@ -54,8 +52,6 @@ class GloveSelectiveEmbedding(nn.Module):
 
         return word2id, id2word, id2vect
 
-    def forward(self, x):
-        return self.embedding(x)
 
 
 
