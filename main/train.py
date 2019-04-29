@@ -85,8 +85,7 @@ class Train(object):
         if self.ml_enable:
             output = self.train_ml(enc_outputs, dec_hidden, dec_cell, batch, epoch_counter)
 
-            ml_loss = t.sum(output[1], dim=1) / batch.summaries_len.float()
-            ml_loss = t.mean(ml_loss)
+            ml_loss = t.mean(output[1])
         else:
             ml_loss = cuda(t.zeros(1))
 
@@ -131,9 +130,9 @@ class Train(object):
 
             # loss
 
-            sampling_loss = t.sum(sampling_output[1], dim=1) / t.sum(sampling_output[1] != 0, dim=1).float()
+            sampling_log_prob = sampling_output[1]
 
-            rl_loss = (sampling_scores - baseline_scores) * sampling_loss
+            rl_loss = -(sampling_scores - baseline_scores) * sampling_log_prob
             rl_loss = t.mean(rl_loss)
 
             # reward
@@ -153,7 +152,8 @@ class Train(object):
 
         loss.backward()
 
-        nn.utils.clip_grad_norm_(self.seq2seq.parameters(), self.clip_gradient_max_norm)
+        if self.clip_gradient_max_norm is not None:
+            nn.utils.clip_grad_norm_(self.seq2seq.parameters(), self.clip_gradient_max_norm)
 
         self.optimizer.step()
 
@@ -216,11 +216,13 @@ class Train(object):
 
             pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat([pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
 
+        loss = t.sum(loss, dim=1) / batch.summaries_len.float()
+
         return y, loss
 
     def train_rl(self, enc_outputs, dec_hidden, dec_cell, batch, sampling):
         y                       = None
-        loss                    = None
+        log_prob                = None
         enc_temporal_score      = None
         pre_dec_hiddens         = None
         stop_decoding_mask      = cuda(t.zeros(batch.size))
@@ -229,6 +231,7 @@ class Train(object):
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
         dec_input               = batch.summaries[:, 0]
         enc_ctx_vector          = cuda(t.zeros(batch.size, 2 * self.enc_hidden_size))
+        decoding_padding_mask   = []
 
         for i in range(self.max_dec_steps):
             ## decoding
@@ -249,9 +252,9 @@ class Train(object):
                 sampling_dist = Categorical(vocab_dist)
                 dec_output = sampling_dist.sample()
 
-                step_loss = sampling_dist.log_prob(dec_output)
+                step_log_prob = sampling_dist.log_prob(dec_output)
 
-                loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)
+                log_prob = step_log_prob.unsqueeze(1) if log_prob is None else t.cat([log_prob, step_log_prob.unsqueeze(1)], dim=1)
             else:
                 ## greedy search
                 _, dec_output = t.max(vocab_dist, dim=1)
@@ -269,6 +272,8 @@ class Train(object):
             if len(stop_decoding_mask[stop_decoding_mask == 1]) == len(stop_decoding_mask):
                 break
 
+            decoding_padding_mask.append(1 - stop_decoding_mask)
+
             ## if next decoder input is oov, change it to TK_UNKNOWN
 
             dec_input = dec_output
@@ -279,7 +284,18 @@ class Train(object):
 
             pre_dec_hiddens = dec_hidden.unsqueeze(1) if pre_dec_hiddens is None else t.cat([pre_dec_hiddens, dec_hidden.unsqueeze(1)], dim=1)
 
-        return y, loss
+        # masking padding - not considering sampled words with padding mask = 0
+
+        if sampling:
+            decoding_padding_mask = t.stack(decoding_padding_mask, dim=1)
+
+            log_prob = log_prob * decoding_padding_mask
+
+            sampling_lens = t.sum(decoding_padding_mask, dim=1)
+
+            log_prob = t.sum(log_prob, dim=1) / sampling_lens
+
+        return y, log_prob
 
     def train(self):
         self.seq2seq.train()
@@ -380,7 +396,7 @@ class Train(object):
 
         rouge           = Rouge()
         total_scores    = []
-        eval_time       = time.time()
+        toal_eval_time  = time.time()
         batch_counter   = 0
 
         while True:
@@ -423,11 +439,11 @@ class Train(object):
 
         avg_score = sum(total_scores) / len(total_scores)
 
-        eval_time = time.time() - eval_time
+        toal_eval_time = time.time() - toal_eval_time
 
         self.logger.debug('examples: %d', len(total_scores))
         self.logger.debug('avg rouge-l score: %.3f', avg_score)
-        self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=eval_time)))
+        self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=toal_eval_time)))
 
     def load_model(self):
         model_file = conf.get('train:load-model-file')

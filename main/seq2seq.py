@@ -94,7 +94,7 @@ class Seq2Seq(nn.Module):
         # stop decoding mask
         stop_dec_mask = cuda(t.zeros(len(x)))
 
-        enc_ctx_vector = t.zeros(batch_size, 2 * self.enc_hidden_size)
+        enc_ctx_vector = cuda(t.zeros(batch_size, 2 * self.enc_hidden_size))
 
         enc_temporal_score = None
 
