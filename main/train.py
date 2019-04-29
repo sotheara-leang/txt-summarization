@@ -381,8 +381,11 @@ class Train(object):
         rouge           = Rouge()
         total_scores    = []
         eval_time       = time.time()
+        batch_counter   = 0
 
         while True:
+            eval_time = time.time()
+
             batch = self.data_loader.next_batch()
 
             if batch is None:
@@ -407,7 +410,16 @@ class Train(object):
             scores = rouge.get_scores(list(gen_summaries), list(reference_summaries))
             scores = [score["rouge-l"]["f"] for score in scores]
 
-            total_scores += scores
+            avg_sores = sum(scores) / len(scores)
+
+            eval_time = time.time() - eval_time
+
+            if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
+                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%.3f\t\ttime=%s', batch_counter + 1, avg_sores, str(datetime.timedelta(seconds=eval_time)))
+
+            total_scores.append(avg_sores)
+
+            batch_counter += 1
 
         avg_score = sum(total_scores) / len(total_scores)
 

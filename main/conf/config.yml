@@ -52,5 +52,7 @@ eval:
   log-batch: true
   log-batch-interval: 2
 
+  load-model-file: data/result/giga-model.ckpt
+
   article-file: data/extract/giga-article.txt
   summary-file: data/extract/giga-summary.txt
