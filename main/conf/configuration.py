@@ -4,6 +4,7 @@ import yaml
 from yaml import Loader, Dumper
 from singleton_decorator import singleton
 from main.common.util.file_util import FileUtil
+from main.common.util.dict_util import DictUtil
 
 
 @singleton
@@ -49,5 +50,8 @@ class Configuration:
     def dump(self):
         return yaml.dump(self.cfg, Dumper=Dumper)
 
+    def merge(self, conf_file):
+        with open(FileUtil.get_file_path(conf_file), 'r') as file:
+            cfg = yaml.load(file, Loader=Loader)
 
-
+            DictUtil.dict_merge(self.cfg, cfg)

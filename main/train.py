@@ -6,6 +6,7 @@ from tensorboardX import SummaryWriter
 import os
 import time
 import datetime
+import argparse
 
 from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
@@ -509,5 +510,14 @@ class Train(object):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--conf_file', type=str)
+
+    args = parser.parse_args()
+
+    config_file = args.conf_file
+    if config_file is not None:
+        conf.merge(config_file)
+
     train = Train()
     train.run()
