@@ -6,12 +6,16 @@ from main.conf.configuration import Configuration
 #
 conf = Configuration()
 
-#
-device = t.device('cuda' if t.cuda.is_available() else 'cpu')
 
+def cuda(tensor, device=None):
+    if device is None:
+        device = conf.get('device')
+        if device is None:
+            device = t.device('cuda' if t.cuda.is_available() else 'cpu')
+        else:
+            device = t.device(device)
 
-def cuda(tensor, device_=None):
-    return tensor.to(device_ if device_ is not None else device)
+    return tensor.to(device)
 
 
 def getLogger(self):
