@@ -8,13 +8,31 @@ import tqdm
 ptb_unescape = {'<unk>': '[UNK]'}
 
 
-def count_samples(file_name):
+def count_samples(file_in):
     counter = 0
-    with open(file_name, 'r') as reader:
-        while reader.readline() != '':
+    with open(file_in, 'r', encoding='utf-8') as reader:
+        for line in tqdm.tqdm(reader):
+
+            if line == '':
+                break
+
             counter += 1
 
     return counter
+
+
+def count_max_sample_len(file_name):
+    lengths = []
+
+    with open(file_name, 'r') as reader:
+        for line in tqdm.tqdm(reader):
+
+            if line == '':
+                break
+
+            lengths.append(len(line.split()))
+
+    return max(lengths)
 
 
 def extract_samples(file_in, start_index, end_index, dir_out, fname):
@@ -189,6 +207,8 @@ if __name__ == '__main__':
         generate_vocab(args.file, args.dir_out, args.fname, args.max_vocab)
     elif args.opt == 'count':
         print(count_samples(args.file[0]))
+    elif args.opt == 'max_len':
+        print(count_max_sample_len(args.file[0]))
     elif args.opt == 'extract':
         extract_samples(args.file[0], args.sindex, args.eindex, args.dir_out, args.fname)
     elif args.opt == 'gen_glove_vocab':
