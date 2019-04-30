@@ -5,7 +5,7 @@ import tqdm
 import string
 import re
 
-ptb_unescape = {'-lrb-': '(', '-rrb-': ')', '-lcb-': '{', '-rcb-': '}', '<t>': '', '</t>': ''}
+ptb_unescape = {'<t>': '', '</t>': ''}
 
 
 def count_samples(file_in):
@@ -23,7 +23,7 @@ def extract_samples(file_in, start_index, end_index, dir_out, fname):
     if not os.path.exists(dir_out):
         os.makedirs(dir_out)
 
-    counter = 0
+    counter = 1
 
     output_fname = filename if fname is None else fname
 
@@ -37,11 +37,6 @@ def extract_samples(file_in, start_index, end_index, dir_out, fname):
             if counter < start_index:
                 counter += 1
                 continue
-
-            # for article
-            delimiter = line.find('--')
-            if delimiter != -1:
-                line = line[line.find('--') + 2:]
 
             for abbr, sign in ptb_unescape.items():
                 line = line.replace(abbr, sign)
@@ -121,8 +116,8 @@ if __name__ == '__main__':
     parser.add_argument('--file', '--names-list', nargs="*")
     parser.add_argument('--dir_out', type=str, default="extract")
     parser.add_argument('--max_vocab', type=int, default="-1")
-    parser.add_argument('--sindex', type=int, default="0")
-    parser.add_argument('--eindex', type=int, default="999")
+    parser.add_argument('--sindex', type=int, default="1")
+    parser.add_argument('--eindex', type=int, default="1000")
     parser.add_argument('--fname', type=str)
 
     args = parser.parse_args()

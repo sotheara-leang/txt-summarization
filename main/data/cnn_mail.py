@@ -59,11 +59,16 @@ class CNNProcessedDataLoader(DataLoader):
                 yield self.get_data(example)
 
     def get_data(self, example):
+        ptb_unescape = {'<t>': '', '</t>': ''}
+
         try:
             article_text = example.features.feature['article'].bytes_list.value[0]  # the article text was saved under the key 'article' in the data files
             abstract_text = example.features.feature['abstract'].bytes_list.value[0]  # the abstract text was saved under the key 'abstract' in the data files
             article_text = article_text.decode()
             abstract_text = abstract_text.decode()
+
+            for abbr, sign in ptb_unescape.items():
+                abstract_text = abstract_text.replace(abbr, sign)
 
             return article_text, abstract_text
 
