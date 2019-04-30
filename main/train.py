@@ -396,7 +396,7 @@ class Train(object):
 
         rouge           = Rouge()
         total_scores    = []
-        toal_eval_time  = time.time()
+        total_eval_time = time.time()
         batch_counter   = 0
 
         while True:
@@ -426,24 +426,24 @@ class Train(object):
             scores = rouge.get_scores(list(gen_summaries), list(reference_summaries))
             scores = [score["rouge-l"]["f"] for score in scores]
 
-            avg_sores = sum(scores) / len(scores)
+            avg_scores = sum(scores) / len(scores)
 
             eval_time = time.time() - eval_time
 
             if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
-                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%.3f\t\ttime=%s', batch_counter + 1, avg_sores, str(datetime.timedelta(seconds=eval_time)))
+                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%.3f\t\ttime=%s', batch_counter + 1, avg_scores, str(datetime.timedelta(seconds=eval_time)))
 
-            total_scores.append(avg_sores)
+            total_scores.append(avg_scores)
 
             batch_counter += 1
 
-        avg_score = sum(total_scores) / len(total_scores)
+        total_avg_score = sum(total_scores) / len(total_scores)
 
-        toal_eval_time = time.time() - toal_eval_time
+        total_eval_time = time.time() - total_eval_time
 
         self.logger.debug('examples: %d', len(total_scores))
-        self.logger.debug('avg rouge-l score: %.3f', avg_score)
-        self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=toal_eval_time)))
+        self.logger.debug('avg rouge-l score: %.3f', total_avg_score)
+        self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=total_eval_time)))
 
     def load_model(self):
         model_file = conf.get('train:load-model-file')
