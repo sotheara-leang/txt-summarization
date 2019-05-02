@@ -16,7 +16,13 @@ class GigaWorldDataLoader(DataLoader):
                 article = next(art_reader)
                 summary = next(sum_reader)
 
-                yield article.strip(), summary.strip()
+                article = article.strip()
+                summary = summary.strip()
+
+                if article == '' or summary == '':
+                    continue
+
+                yield article, summary
 
 
 class GigaWorldMemoryDataLoader(MemoryDataLoader):
