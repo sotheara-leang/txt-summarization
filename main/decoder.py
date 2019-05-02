@@ -17,6 +17,7 @@ class Decoder(nn.Module):
             y               : B, E
             pre_hidden      : B, DH
             pre_cell        : B, DH
+            enc_ctx_vector  : B, 2EH
             
         :returns
             hidden          : B, DH

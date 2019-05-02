@@ -58,7 +58,7 @@ class Seq2Seq(nn.Module):
     '''
             :params
                 x                : B, L
-                x_len            : L
+                x_len            : B
                 extend_vocab_x   : B, L
                 max_oov_len      : C
 
@@ -151,6 +151,7 @@ class Seq2Seq(nn.Module):
         :returns
             vocab_dist              :   B, V + OOV
             dec_hidden              :   B, DH
+            dec_cell                :   B, DH
             enc_ctx_vector          :   B, 2EH
             enc_temporal_score      :   B, L
             dec_ctx_vector          :   B, DH

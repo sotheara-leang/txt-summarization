@@ -226,12 +226,12 @@ class Train(object):
         log_prob                = None
         enc_temporal_score      = None
         pre_dec_hiddens         = None
-        stop_decoding_mask      = cuda(t.zeros(batch.size))
         enc_padding_mask        = batch.articles_padding_mask
         extend_vocab_x          = batch.extend_vocab_articles
         max_ovv_len             = max([len(vocab) for vocab in batch.oovs])
         dec_input               = batch.summaries[:, 0]
         enc_ctx_vector          = cuda(t.zeros(batch.size, 2 * self.enc_hidden_size))
+        stop_decoding_mask      = cuda(t.zeros(batch.size))
         decoding_padding_mask   = []
 
         for i in range(self.max_dec_steps):
@@ -268,12 +268,12 @@ class Train(object):
 
             ## stop decoding mask
 
+            decoding_padding_mask.append(1 - stop_decoding_mask)
+
             stop_decoding_mask[dec_output == TK_STOP['id']] = 1
 
             if len(stop_decoding_mask[stop_decoding_mask == 1]) == len(stop_decoding_mask):
                 break
-
-            decoding_padding_mask.append(1 - stop_decoding_mask)
 
             ## if next decoder input is oov, change it to TK_UNKNOWN
 
