@@ -3,61 +3,6 @@ import numpy as np
 import pickle
 import os
 import bcolz
-import spacy
-import collections
-
-from main.common.util.file_util import FileUtil
-
-nlp = spacy.load("en_core_web_sm")
-
-
-def generate_vocab2(file_in, dir_out):
-    with open(file_in, 'r') as r, open('extract/vocab.txt', 'w') as w:
-
-        vocab_counter = collections.Counter()
-
-        while True:
-            n = 10000
-
-            words = []
-            for i in range(n):
-                line = r.readline()
-                if line == '':
-                    break
-
-                line = line.split()
-
-                word = line[0]
-                words.append(word)
-
-            doc = nlp(' '.join(words))
-
-            filters = [i.text for i in doc.ents if i.label_.lower()
-                       in ['person', 'loc', 'event', 'work_of_art', 'law', 'gpe', 'org', 'time', 'money']]
-
-            words = []
-            for lexeme in doc:
-                if lexeme.is_digit \
-                        or lexeme.is_title \
-                        or lexeme.like_email \
-                        or lexeme.like_url \
-                        or lexeme.like_num \
-                        or lexeme.is_space\
-                        or lexeme.text in filters:
-                    continue
-
-                words.append(lexeme.text)
-
-            vocab_counter.update(words)
-
-            print(len(vocab_counter))
-
-            if line == '':
-                break
-
-        for i, token in enumerate(vocab_counter):
-            count_ = vocab_counter[token]
-            w.write(token + ' ' + str(count_) + '\n')
 
 
 def generate_vocab(file_in, dir_out):
@@ -135,4 +80,4 @@ if __name__ == '__main__':
     elif opt == 'extract-vocab':
         extract_vocab(args.file_in, args.dir_out)
     else:
-        generate_vocab2(FileUtil.get_file_path('data/raw/glove.6B.50d.txt'), args.dir_out)
+        generate_vocab(args.file_in, args.dir_out)

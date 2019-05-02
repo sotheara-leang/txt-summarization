@@ -1,6 +1,5 @@
 from unittest import TestCase
 
-import torch as t
 
 from main.common.common import *
 from main.decoder_attention import DecoderAttention
@@ -14,6 +13,7 @@ class TestDecoderAttention(TestCase):
 
         decoder_att = DecoderAttention()
 
-        context_vector = decoder_att(dec_hidden, pre_dec_hidden)
+        context_vector, attention = decoder_att(dec_hidden, pre_dec_hidden)
 
         print(context_vector, context_vector.size())
+        print(attention, attention.size())

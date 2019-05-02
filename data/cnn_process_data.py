@@ -1,20 +1,71 @@
 import argparse
 import os
 import collections
-import spacy
+import tqdm
+import string
+import re
 
-nlp = spacy.load("en_core_web_sm")
-
-ptb_unescape = {'-lrb-': '(', '-rrb-': ')', '-lcb-': '{', '-rcb-': '}', '<t>': '', '</t>': ''}
+ptb_unescape = {'<t>': '', '</t>': ''}
 
 
 def count_samples(file_in):
     counter = 0
-    with open(file_in, 'r') as reader:
-        while reader.readline() != '':
+    with open(file_in, 'r', encoding='utf-8') as reader:
+        for line in tqdm.tqdm(reader):
+
+            if line == '':
+                break
+
             counter += 1
 
     return counter
+
+
+def count_max_sample_len(file_name):
+    lengths = []
+
+    with open(file_name, 'r') as reader:
+        for line in tqdm.tqdm(reader):
+
+            if line == '':
+                break
+
+            lengths.append(len(line.split()))
+
+    return max(lengths)
+
+
+def extract_samples(file_in, start_index, end_index, dir_out, fname):
+    path, filename = os.path.split(file_in)
+
+    if not os.path.exists(dir_out):
+        os.makedirs(dir_out)
+
+    counter = 1
+
+    output_fname = filename if fname is None else fname
+
+    with open(file_in, 'r', encoding='utf-8') as reader, open(dir_out + '/' + output_fname, 'w', encoding='utf-8') as writer:
+        for line in tqdm.tqdm(reader):
+
+            if end_index > 0 and counter > end_index:
+                break
+
+            if line == '':
+                break
+
+            if counter < start_index:
+                counter += 1
+                continue
+
+            for abbr, sign in ptb_unescape.items():
+                line = line.replace(abbr, sign)
+
+            line = line.strip()
+
+            writer.write(line + '\n')
+
+            counter += 1
 
 
 def generate_vocab(files_in, dir_out, fname, max_vocab):
@@ -25,34 +76,25 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
     vocab_counter = collections.Counter()
 
     for file in files_in:
-        with open(file, 'r') as reader:
+        with open(file, 'r', encoding='utf-8') as reader:
 
             # build vocab
-            for line in reader:
+            for line in tqdm.tqdm(reader):
 
                 if line == '':
                     break
 
-                doc = nlp(line.lower())
+                tokens = line.split()
 
-                words = []
-                for lexeme in doc:
-
-                    if lexeme.is_digit \
-                            or lexeme.is_title \
-                            or lexeme.like_email \
-                            or lexeme.like_url \
-                            or lexeme.like_num \
-                            or lexeme.is_space \
-                            or lexeme.is_space\
-                            or lexeme.text in ptb_unescape.keys() \
-                            or lexeme.text == '<t>':
-
+                valid_tokens = []
+                for token in tokens:
+                    token = token.strip()
+                    if not valid_token(token):
                         continue
 
-                    words.append(lexeme.text)
+                    valid_tokens.append(token)
 
-                vocab_counter.update(words)
+                vocab_counter.update(valid_tokens)
 
                 if max_vocab > 0 and len(vocab_counter) >= max_vocab:
                     reach_max_vocab = True
@@ -63,64 +105,36 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
 
     output_fname = 'vocab.txt' if fname is None else fname
 
-    # write vocab
-    with open(dir_out + '/' + output_fname, 'w') as writer:
-        for i, token in enumerate(vocab_counter):
+    with open(dir_out + '/' + output_fname, 'w', encoding='utf-8') as writer:
+        vocab_counter = sorted(vocab_counter.items(), key=lambda e: e[1], reverse=True)
+
+        for i, element in enumerate(vocab_counter):
             if max_vocab > 0 and i >= max_vocab:
                 break
 
-            count = vocab_counter[token]
+            token = element[0]
+            count = element[1]
+
             writer.write(token + ' ' + str(count) + '\n')
 
 
-def extract_samples(file_in, start_index, end_index, dir_out, fname):
-    path, filename = os.path.split(file_in)
-
-    if not os.path.exists(dir_out):
-        os.makedirs(dir_out)
-
-    counter = 0
-
-    output_fname = filename if fname is None else fname
-
-    with open(file_in, 'r') as reader, open(dir_out + '/' + output_fname, 'w') as writer:
-        while counter <= end_index:
-            line = reader.readline()
-
-            if line == '':
-                break
-
-            if counter < start_index:
-                counter += 1
-                continue
-
-            # for article
-            delimiter = line.find('--')
-            if delimiter != -1:
-                line = line[line.find('--') + 2:]
-
-            for abbr, sign in ptb_unescape.items():
-                line = line.replace(abbr, sign)
-
-            line = line.strip()
-
-            if line == '':
-                continue
-
-            writer.write(line + '\n')
-
-            counter += 1
+def valid_token(token):
+    return token in string.punctuation or \
+           (token != ''
+            and token != '<t>'
+            and token not in ptb_unescape.keys()
+            and re.match('^[a-z]+|[a-z]+(-[a-z]+)+|\'[a-z]+$', token))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--opt', type=str, default="gen-vocab")
+    parser.add_argument('--opt', type=str, default="extract")
     parser.add_argument('--file', '--names-list', nargs="*")
     parser.add_argument('--dir_out', type=str, default="extract")
     parser.add_argument('--max_vocab', type=int, default="-1")
-    parser.add_argument('--sindex', type=int, default="0")
-    parser.add_argument('--eindex', type=int, default="999")
+    parser.add_argument('--sindex', type=int, default="1")
+    parser.add_argument('--eindex', type=int, default="1000")
     parser.add_argument('--fname', type=str)
 
     args = parser.parse_args()
@@ -129,5 +143,7 @@ if __name__ == '__main__':
         generate_vocab(args.file, args.dir_out, args.fname, args.max_vocab)
     elif args.opt == 'count':
         print(count_samples(args.file[0]))
+    elif args.opt == 'max_len':
+        print(count_max_sample_len(args.file[0]))
     elif args.opt == 'extract':
         extract_samples(args.file[0], args.sindex, args.eindex, args.dir_out, args.fname)
