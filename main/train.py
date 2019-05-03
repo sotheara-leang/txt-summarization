@@ -159,6 +159,10 @@ class Train(object):
         self.optimizer.step()
 
         time_spent = time.time() - start_time
+        
+        loss = loss.detach()
+        ml_loss = ml_loss.detach()
+        rl_loss = rl_loss.detach()
 
         return loss, ml_loss, rl_loss, reward, rl_enable, time_spent
 
@@ -347,9 +351,9 @@ class Train(object):
                             self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s', i + 1, batch_counter + 1,
                                               loss, ml_loss, str(datetime.timedelta(seconds=time_spent)))
 
-                total_loss += loss
-                total_ml_loss += ml_loss
-                total_rl_loss += rl_loss
+                total_loss += loss.item()
+                total_ml_loss += ml_loss.item()
+                total_rl_loss += rl_loss.item()
                 total_samples_award += samples_reward
 
                 batch_counter += 1
