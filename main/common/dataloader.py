@@ -14,7 +14,7 @@ class DataLoader(object):
 
     def next_batch(self):
         samples = []
-        for i in range(0, self.batch_size):
+        for i in range(self.batch_size):
             sample = None
             try:
                 sample = next(self.generator)
