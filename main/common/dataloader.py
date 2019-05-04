@@ -38,11 +38,14 @@ class DataLoader(object):
     def read_all(self):
         samples = []
         while True:
-            sample = self.next()
-            if sample is None:
-                break
+            try:
+                sample = self.next()
+                if sample is None:
+                    break
 
-            samples.append(sample)
+                samples.append(sample)
+            except Exception:
+                pass
 
         self.reset()
 
