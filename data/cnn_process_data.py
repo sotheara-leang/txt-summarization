@@ -24,7 +24,7 @@ def count_samples(file_in):
 def count_max_sample_len(file_name):
     lengths = []
 
-    with open(file_name, 'r') as reader:
+    with open(file_name, 'r', encoding='utf-8') as reader:
         for line in tqdm.tqdm(reader):
 
             if line == '':
