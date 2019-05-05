@@ -308,7 +308,6 @@ class Train(object):
 
         self.logger.debug('>>> training:')
 
-        total_batch_counter = 0
         train_time = time.time()
 
         criterion_scheduler = t.optim.lr_scheduler.StepLR(self.optimizer, self.lr_decay_epoch, self.lr_decay)
@@ -360,7 +359,6 @@ class Train(object):
                 total_samples_award += samples_reward
 
                 batch_counter += 1
-                total_batch_counter += 1
 
             epoch_loss = total_loss / batch_counter
             epoch_ml_loss = total_ml_loss / batch_counter
@@ -380,7 +378,7 @@ class Train(object):
             else:
                 self.logger.debug('rl-loss_avg\t=\tNA')
 
-            self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
+            self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
 
             # reload data set
             self.data_loader.reset()
@@ -433,17 +431,15 @@ class Train(object):
 
             # calculate rouge score
 
-            scores = rouge.get_scores(list(gen_summaries), list(reference_summaries))
-            scores = [score["rouge-l"]["f"] for score in scores]
-
-            avg_scores = sum(scores) / len(scores)
+            avg_score = rouge.get_scores(list(gen_summaries), list(reference_summaries), avg=True)
+            avg_score = avg_score["rouge-l"]["f"]
 
             eval_time = time.time() - eval_time
 
             if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
-                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%.3f\t\ttime=%s', batch_counter + 1, avg_scores, str(datetime.timedelta(seconds=eval_time)))
+                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%.3f\t\ttime=%s', batch_counter + 1, avg_score, str(datetime.timedelta(seconds=eval_time)))
 
-            total_scores.append(avg_scores)
+            total_scores.append(avg_score)
 
             batch_counter += 1
 
