@@ -42,7 +42,7 @@ def extract_samples(file_in, start_index, end_index, dir_out, fname):
     with open(file_in[0], 'r', encoding='utf-8') as art_reader, open(file_in[1], 'r', encoding='utf-8') as sum_reader:
         for article in tqdm.tqdm(art_reader):
 
-            if article == '' or counter > end_index:
+            if article == '' or (end_index > 0 and counter > end_index):
                 break
 
             if counter < start_index:
