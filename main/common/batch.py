@@ -67,7 +67,7 @@ class BatchInitializer(object):
                 enc_extend_vocab_article += [TK_STOP['id']]
                 enc_extend_vocab_article += [TK_PADDING['id']] * (max_article_len - len(enc_extend_vocab_article))
             else:
-                enc_extend_vocab_article = enc_article
+                enc_extend_vocab_article = []
                 article_oovs = []
 
             enc_articles.append(enc_article)
@@ -96,7 +96,7 @@ class BatchInitializer(object):
         articles_len = cuda(t.tensor(articles_len))
 
         enc_extend_vocab_articles = cuda(t.tensor(enc_extend_vocab_articles))
-        enc_articles_padding_mask = cuda(t.ByteTensor(enc_articles_padding_mask))
+        enc_articles_padding_mask = cuda(t.tensor(enc_articles_padding_mask))
 
         enc_summaries = cuda(t.tensor(enc_summaries))
         summaries_len = cuda(t.tensor(summaries_len))

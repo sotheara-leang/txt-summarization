@@ -4,7 +4,7 @@ import torch.nn.functional as f
 from main.encoder import Encoder
 from main.reduce_encoder import ReduceEncoder
 from main.decoder import Decoder
-from main.encoder_attention import EncoderAttention
+from main.encoder_attention import *
 from main.decoder_attention import DecoderAttention
 from main.common.vocab import *
 from main.common.common import *
@@ -46,7 +46,7 @@ class Seq2Seq(nn.Module):
             proj_layer = nn.Linear(combined_hidden_size, self.emb_size)
 
             output_layer = nn.Linear(self.emb_size, self.vocab_size)
-            output_layer.weight = self.embedding.weight  # sharing weight with embedding
+            output_layer.weight.data = self.embedding.weight.data  # sharing weight with embedding
 
             self.vocab_gen = nn.Sequential(
                 proj_layer,
@@ -89,10 +89,10 @@ class Seq2Seq(nn.Module):
         for i in range(batch_size):
             enc_padding_mask[i, :x_len[i]] = t.zeros(1, x_len[i])
 
-        enc_padding_mask = cuda(enc_padding_mask.byte())
+        enc_padding_mask = cuda(enc_padding_mask)
 
         # stop decoding mask
-        stop_dec_mask = cuda(t.zeros(len(x)))
+        stop_dec_mask = cuda(t.zeros(batch_size))
 
         enc_ctx_vector = cuda(t.zeros(batch_size, 2 * self.enc_hidden_size))
 
