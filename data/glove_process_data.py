@@ -45,7 +45,7 @@ def generate_vocab(file_in, dir_out):
 
 def count(file_in):
     counter = 0
-    with open(file_in, 'r') as f:
+    with open(file_in, 'r', encoding='utf-8') as f:
         for line in f:
             counter += 1
     return counter

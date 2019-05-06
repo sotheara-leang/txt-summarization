@@ -7,6 +7,7 @@ import os
 import time
 import datetime
 import argparse
+from random import shuffle
 
 from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
@@ -68,8 +69,6 @@ class Train(object):
     def train_batch(self, batch, epoch_counter):
         start_time = time.time()
 
-        rouge = Rouge()
-
         ## encoding input
 
         x = self.seq2seq.embedding(batch.articles)
@@ -123,6 +122,8 @@ class Train(object):
 
             # calculate rouge score
 
+            rouge = Rouge()
+
             sampling_scores = rouge.get_scores(list(sampling_summaries), list(reference_summaries))
             sampling_scores = cuda(t.tensor([score["rouge-l"]["f"] for score in sampling_scores]))
 
@@ -133,7 +134,7 @@ class Train(object):
 
             sampling_log_prob = sampling_output[1]
 
-            rl_loss = -(sampling_scores - baseline_scores) * sampling_log_prob
+            rl_loss = (baseline_scores - sampling_scores) * sampling_log_prob
             rl_loss = t.mean(rl_loss)
 
             # reward
@@ -157,12 +158,12 @@ class Train(object):
             nn.utils.clip_grad_norm_(self.seq2seq.parameters(), self.clip_gradient_max_norm)
 
         self.optimizer.step()
-
-        time_spent = time.time() - start_time
         
         loss = loss.detach()
         ml_loss = ml_loss.detach()
         rl_loss = rl_loss.detach()
+
+        time_spent = time.time() - start_time
 
         return loss, ml_loss, rl_loss, reward, rl_enable, time_spent
 
@@ -179,7 +180,7 @@ class Train(object):
         dec_input               = batch.summaries[:, 0]
         enc_ctx_vector          = cuda(t.zeros(batch.size, 2 * self.enc_hidden_size))
 
-        for i in range(max_dec_len - 1):
+        for i in range(1, max_dec_len):
             ## decoding
             vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, _ = self.seq2seq.decode(
                 dec_input,
@@ -195,13 +196,13 @@ class Train(object):
 
             ## loss
 
-            step_loss = self.criterion(t.log(vocab_dist + 1e-20), target_y[:, i + 1])
+            step_loss = self.criterion(t.log(vocab_dist + 1e-20), target_y[:, i])
 
             loss = step_loss.unsqueeze(1) if loss is None else t.cat([loss, step_loss.unsqueeze(1)], dim=1)
 
             ## output
 
-            dec_output = t.multinomial(vocab_dist, 1).squeeze().detach()
+            dec_output = t.multinomial(vocab_dist, 1).squeeze(1).detach()
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
@@ -211,7 +212,7 @@ class Train(object):
 
             use_ground_truth = cuda((t.rand(batch.size) < forcing_ratio).long())
 
-            dec_input = use_ground_truth * target_y[:, i + 1] + (1 - use_ground_truth) * dec_output
+            dec_input = use_ground_truth * target_y[:, i] + (1 - use_ground_truth) * dec_output
 
             ## if next decoder input is oov, change it to TK_UNKNOWN
 
@@ -238,7 +239,7 @@ class Train(object):
         stop_decoding_mask      = cuda(t.zeros(batch.size))
         decoding_padding_mask   = []
 
-        for i in range(self.max_dec_steps):
+        for i in range(1, self.max_dec_steps):
             ## decoding
             vocab_dist, dec_hidden, dec_cell, _, enc_temporal_score, _ = self.seq2seq.decode(
                 dec_input,
@@ -333,6 +334,8 @@ class Train(object):
                 if batch is None:
                     break
 
+                shuffle(batch)
+
                 # init batch
                 batch = self.batch_initializer.init(batch)
 
@@ -366,9 +369,9 @@ class Train(object):
 
             # log to tensorboard
             if self.tb_log_dir is not None:
-                self.tb_writer.add_scalar('Epoch_Train/Loss', loss, i + 1)
-                self.tb_writer.add_scalar('Epoch_Train/ML-Loss', ml_loss, i + 1)
-                self.tb_writer.add_scalar('Epoch_Train/RL-Loss', rl_loss, i + 1)
+                self.tb_writer.add_scalar('Epoch_Train/Loss', epoch_loss, i + 1)
+                self.tb_writer.add_scalar('Epoch_Train/ML-Loss', epoch_ml_loss, i + 1)
+                self.tb_writer.add_scalar('Epoch_Train/RL-Loss', epoch_rl_loss, i + 1)
 
             self.logger.debug('loss_avg\t=\t%.3f', epoch_loss)
             self.logger.debug('ml-loss-avg\t=\t%.3f', epoch_ml_loss)
@@ -411,6 +414,8 @@ class Train(object):
 
             if batch is None:
                 break
+
+            shuffle(batch)
 
             batch = self.batch_initializer.init(batch)
 
@@ -467,7 +472,7 @@ class Train(object):
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
             self.logger.debug('epoch: %s', str(epoch + 1))
-            self.logger.debug('loss: %s', str(loss.item()))
+            self.logger.debug('loss: %s', str(loss))
         else:
             self.logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
 
