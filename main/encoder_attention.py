@@ -25,23 +25,24 @@ class EncoderAttention(nn.Module):
     '''
 
     def forward(self, dec_hidden, enc_hiddens, enc_padding_mask, enc_temporal_score):
-        score = t.bmm(self.w_attn(enc_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, L, DH) *  (B, DH, 1) => (B, L)
-
-        score = score.masked_fill_(enc_padding_mask.byte(), -float('inf'))
-
-        score = f.softmax(score, dim=1)
+        score = t.bmm(self.w_attn(enc_hiddens), dec_hidden.unsqueeze(2)).squeeze(2)  # (B, L, DH) *  (B, DH, 1) => (B, L
 
         # temporal normalization
 
+        exp_score = t.exp(score)
+
         if enc_temporal_score is None:
-            enc_temporal_score = score + 1e-10
+            score = exp_score
+            enc_temporal_score = exp_score
         else:
-            score = score / enc_temporal_score
-            enc_temporal_score = enc_temporal_score + score
+            score = exp_score / enc_temporal_score
+            enc_temporal_score = enc_temporal_score + exp_score
 
         # normalization
 
-        attention = score / (t.sum(score, dim=1).unsqueeze(1) + 1e-10)   # B, L
+        score = score * enc_padding_mask.float()
+
+        attention = score / t.sum(score, dim=1).unsqueeze(1)  # B, L
 
         # context vector
 

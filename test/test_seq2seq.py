@@ -1,6 +1,7 @@
 from unittest import TestCase
 
-from main.common.common import *
+from rouge import Rouge
+
 from main.seq2seq import Seq2Seq
 from main.common.simple_vocab import SimpleVocab
 from main.common.util.file_util import FileUtil
@@ -10,6 +11,8 @@ from main.data.giga_world import *
 class TestSeq2Seq(TestCase):
 
     def test(self):
+        rouge = Rouge()
+
         data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
                                           FileUtil.get_file_path(conf.get('train:summary-file')), 2)
 
@@ -25,13 +28,16 @@ class TestSeq2Seq(TestCase):
 
         samples = data_loader.read_all()
 
-        article, reference = samples[3]
+        article, reference = samples[52]
 
         summary = seq2seq.summarize(article)
+
+        score = rouge.get_scores(summary, reference)[0]["rouge-l"]
 
         print('>>> article: ', article)
         print('>>> reference: ', reference)
         print('>>> prediction: ', summary)
+        print('>>> score: ', score)
 
 
 

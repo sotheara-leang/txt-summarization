@@ -49,6 +49,7 @@ class Evaluate(object):
         total_scores    = []
         total_eval_time = time.time()
         batch_counter   = 0
+        example_counter = 0
 
         while True:
             eval_time = time.time()
@@ -87,12 +88,13 @@ class Evaluate(object):
             total_scores.append(avg_score)
 
             batch_counter += 1
+            example_counter += batch.size
 
         avg_score = sum(total_scores) / len(total_scores)
 
         total_eval_time = time.time() - total_eval_time
 
-        self.logger.debug('examples: %d', len(total_scores))
+        self.logger.debug('examples: %d', example_counter)
         self.logger.debug('avg rouge-l score: %.3f', avg_score)
         self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=total_eval_time)))
 
