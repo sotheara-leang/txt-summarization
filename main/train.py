@@ -7,7 +7,6 @@ import os
 import time
 import datetime
 import argparse
-from random import shuffle
 
 from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
@@ -36,7 +35,7 @@ class Train(object):
         self.lr_decay_epoch             = conf.get('train:lr-decay-epoch')
         self.lr_decay                   = conf.get('train:lr-decay')
 
-        self.ml_enable                  = conf.get('train:ml:enable')
+        self.ml_enable                  = conf.get('train:ml:enable', True)
         self.ml_forcing_ratio           = conf.get('train:ml:forcing-ratio', 1)
         self.ml_forcing_decay           = conf.get('train:ml:forcing-decay', 0)
 
@@ -92,7 +91,7 @@ class Train(object):
         ## RL
 
         rl_enable = self.rl_enable
-        if rl_enable:
+        if rl_enable and self.ml_enable is True:
             if self.rl_transit_epoch > 0:
                 rl_enable = epoch_counter >= self.rl_transit_epoch
             else:
@@ -139,16 +138,17 @@ class Train(object):
 
             # reward
 
-            reward = t.mean(sampling_scores - baseline_scores)
+            reward = t.mean(sampling_scores)
+
+            rl_weight = self.rl_weight if self.ml_enable else 1
         else:
-            rl_loss = cuda(t.zeros(1))
-            reward = 0
+            rl_loss     = cuda(t.zeros(1))
+            reward      = 0
+            rl_weight   = 0
 
         ## total loss
 
-        rl_weight = self.rl_weight if rl_enable else 0
-
-        loss = rl_weight * rl_loss + (1 - rl_weight) * ml_loss
+        loss = (1 - rl_weight) * ml_loss + rl_weight * rl_loss
 
         self.optimizer.zero_grad()
 
@@ -334,8 +334,6 @@ class Train(object):
                 if batch is None:
                     break
 
-                shuffle(batch)
-
                 # init batch
                 batch = self.batch_initializer.init(batch)
 
@@ -344,15 +342,9 @@ class Train(object):
 
                 epoch_time_spent += time_spent
 
-                if self.log_batch:
-
-                    if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
-                        if enable_rl:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s', i + 1, batch_counter + 1,
-                                loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))
-                        else:
-                            self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=NA,\ttime=%s', i + 1, batch_counter + 1,
-                                              loss, ml_loss, str(datetime.timedelta(seconds=time_spent)))
+                if self.log_batch and self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
+                    self.logger.debug('EP\t%d,\tBAT\t%d:\tloss=%.3f,\tml-loss=%.3f,\trl-loss=%.3f,\treward=%.3f,\ttime=%s', i + 1, batch_counter + 1,
+                        loss, ml_loss, rl_loss, samples_reward, str(datetime.timedelta(seconds=time_spent)))
 
                 total_loss += loss.item()
                 total_ml_loss += ml_loss.item()
@@ -375,12 +367,9 @@ class Train(object):
 
             self.logger.debug('loss_avg\t=\t%.3f', epoch_loss)
             self.logger.debug('ml-loss-avg\t=\t%.3f', epoch_ml_loss)
-            if enable_rl:
-                self.logger.debug('rl-loss_avg\t=\t%.3f,\t reward=%.3f', epoch_rl_loss, epoch_samples_award)
-            else:
-                self.logger.debug('rl-loss_avg\t=\tNA')
-
-            self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
+            self.logger.debug('rl-loss_avg\t=\t%.3f,\t reward=%.3f', epoch_rl_loss, epoch_samples_award)
+            self.logger.debug('rl-loss_avg\t=\tNA')
+            self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=epoch_time_spent)))
 
             # reload data set
             self.data_loader.reset()
@@ -406,6 +395,7 @@ class Train(object):
         total_scores    = []
         total_eval_time = time.time()
         batch_counter   = 0
+        example_counter = 0
 
         while True:
             eval_time = time.time()
@@ -414,8 +404,6 @@ class Train(object):
 
             if batch is None:
                 break
-
-            shuffle(batch)
 
             batch = self.batch_initializer.init(batch)
 
@@ -444,12 +432,13 @@ class Train(object):
             total_scores.append(avg_score)
 
             batch_counter += 1
+            example_counter += batch.size
 
         total_avg_score = sum(total_scores) / len(total_scores)
 
         total_eval_time = time.time() - total_eval_time
 
-        self.logger.debug('examples: %d', len(total_scores))
+        self.logger.debug('examples: %d', example_counter)
         self.logger.debug('avg rouge-l score: %.3f', total_avg_score)
         self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=total_eval_time)))
 

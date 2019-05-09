@@ -38,6 +38,9 @@ class BatchInitializer(object):
         self.pointer_generator = pointer_generator
 
     def init(self, samples):
+        # sort by article length
+        samples = sorted(samples, key=lambda sample: len(sample[0].split()), reverse=True)
+
         articles, summaries = list(zip(*samples))
 
         # article
@@ -57,7 +60,7 @@ class BatchInitializer(object):
         for article_words in articles_words:
             enc_article = self.vocab.words2ids(article_words) + [TK_STOP['id']]
 
-            enc_article_padding_mask = [0] * len(enc_article) + [1] * (max_article_len - len(enc_article))
+            enc_article_padding_mask = [1] * len(enc_article) + [0] * (max_article_len - len(enc_article))
 
             enc_article += [TK_PADDING['id']] * (max_article_len - len(enc_article))
 
@@ -100,10 +103,6 @@ class BatchInitializer(object):
 
         enc_summaries = cuda(t.tensor(enc_summaries))
         summaries_len = cuda(t.tensor(summaries_len))
-
-        # sort tensor
-        articles_len, indices = articles_len.sort(0, descending=True)
-        enc_articles = enc_articles[indices]
 
         return Batch(enc_articles,
                      articles_len,
