@@ -1,5 +1,5 @@
 emb-size: 100
-emb-file: data/extract/embedding
+emb-file: data/train/embedding
 
 enc-hidden-size: 100
 dec-hidden-size: 200
