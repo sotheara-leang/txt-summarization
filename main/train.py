@@ -110,11 +110,15 @@ class Train(object):
             sampling_summaries = []
             sampling_outputs = sampling_output[0].tolist()
             for idx, summary in enumerate(sampling_outputs):
+                summary = [w for w in summary if w != TK_STOP['id']]
+
                 sampling_summaries.append(' '.join(self.vocab.ids2words(summary, batch.oovs[idx])))
 
             baseline_summaries = []
             baseline_outputs = baseline_output[0].tolist()
             for idx, summary in enumerate(baseline_outputs):
+                summary = [w for w in summary if w != TK_STOP['id']]
+
                 baseline_summaries.append(' '.join(self.vocab.ids2words(summary, batch.oovs[idx])))
 
             reference_summaries = batch.original_summaries
@@ -182,7 +186,7 @@ class Train(object):
 
         for i in range(1, max_dec_len):
             ## decoding
-            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, _ = self.seq2seq.decode(
+            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, _, enc_temporal_score, _, _ = self.seq2seq.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,
@@ -241,7 +245,7 @@ class Train(object):
 
         for i in range(1, self.max_dec_steps):
             ## decoding
-            vocab_dist, dec_hidden, dec_cell, _, enc_temporal_score, _ = self.seq2seq.decode(
+            vocab_dist, dec_hidden, dec_cell, _, _, enc_temporal_score, _, _ = self.seq2seq.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,
@@ -411,10 +415,12 @@ class Train(object):
 
             # prediction
 
-            output = self.seq2seq(batch.articles, batch.articles_len, batch.extend_vocab_articles, max_ovv_len)
+            output, _ = self.seq2seq(batch.articles, batch.articles_len, batch.extend_vocab_articles, max_ovv_len)
 
             gen_summaries = []
             for idx, summary in enumerate(output.tolist()):
+                summary = [w for w in summary if w != TK_STOP['id']]
+
                 gen_summaries.append(' '.join(self.vocab.ids2words(summary, batch.oovs[idx])))
 
             reference_summaries = batch.original_summaries
@@ -427,7 +433,7 @@ class Train(object):
             eval_time = time.time() - eval_time
 
             if self.log_batch_interval <= 0 or (batch_counter + 1) % self.log_batch_interval == 0:
-                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%.3f\t\ttime=%s', batch_counter + 1, avg_score, str(datetime.timedelta(seconds=eval_time)))
+                self.logger.debug('BAT\t%d:\t\tavg rouge_l score=%f\t\ttime=%s', batch_counter + 1, avg_score, str(datetime.timedelta(seconds=eval_time)))
 
             total_scores.append(avg_score)
 
@@ -439,7 +445,7 @@ class Train(object):
         total_eval_time = time.time() - total_eval_time
 
         self.logger.debug('examples: %d', example_counter)
-        self.logger.debug('avg rouge-l score: %.3f', total_avg_score)
+        self.logger.debug('avg rouge-l score: %f', total_avg_score)
         self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=total_eval_time)))
 
     def load_model(self):

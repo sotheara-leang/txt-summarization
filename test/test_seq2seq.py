@@ -3,6 +3,7 @@ from unittest import TestCase
 from rouge import Rouge
 
 from main.seq2seq import Seq2Seq
+from main.common.simple_vocab import *
 from main.common.simple_vocab import SimpleVocab
 from main.common.util.file_util import FileUtil
 from main.data.giga_world import *
@@ -10,9 +11,17 @@ from main.data.giga_world import *
 
 class TestSeq2Seq(TestCase):
 
-    def test(self):
+    def get_score(self, summary, reference):
         rouge = Rouge()
 
+        summary = summary.split()
+        summary = [w for w in summary if w != TK_STOP['word']]
+
+        score = rouge.get_scores(' '.join(summary), reference)[0]["rouge-l"]["f"]
+
+        return score
+
+    def test(self):
         data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
                                           FileUtil.get_file_path(conf.get('train:summary-file')), 2)
 
@@ -28,16 +37,17 @@ class TestSeq2Seq(TestCase):
 
         samples = data_loader.read_all()
 
-        article, reference = samples[52]
+        article, reference = samples[3]
 
-        summary = seq2seq.summarize(article)
+        summary, attention = seq2seq.evaluate(article)
 
-        score = rouge.get_scores(summary, reference)[0]["rouge-l"]
+        score = self.get_score(summary, reference)
 
         print('>>> article: ', article)
         print('>>> reference: ', reference)
         print('>>> prediction: ', summary)
         print('>>> score: ', score)
+
 
 
 
