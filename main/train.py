@@ -3,10 +3,10 @@ import torch.nn as nn
 from torch import autograd
 from torch.distributions import Categorical
 from tensorboardX import SummaryWriter
-import os
 import time
 import datetime
 import argparse
+import os
 
 from main.data.giga_world import *
 from main.seq2seq import Seq2Seq
@@ -18,45 +18,45 @@ from main.common.simple_vocab import SimpleVocab
 class Train(object):
 
     def __init__(self):
-        self.logger                     = getLogger(self)
+        self.logger                     = logger(self)
 
-        self.enc_hidden_size            = conf.get('enc-hidden-size')
-        self.dec_hidden_size            = conf.get('dec-hidden-size')
+        self.enc_hidden_size            = conf('enc-hidden-size')
+        self.dec_hidden_size            = conf('dec-hidden-size')
 
-        self.max_enc_steps              = conf.get('max-enc-steps')
-        self.max_dec_steps              = conf.get('max-dec-steps')
+        self.max_enc_steps              = conf('max-enc-steps')
+        self.max_dec_steps              = conf('max-dec-steps')
 
-        self.epoch                      = conf.get('train:epoch')
-        self.batch_size                 = conf.get('train:batch-size')
-        self.clip_gradient_max_norm     = conf.get('train:clip-gradient-max-norm')
-        self.log_batch                  = conf.get('train:log-batch')
-        self.log_batch_interval         = conf.get('train:log-batch-interval', -1)
-        self.lr                         = conf.get('train:lr')
-        self.lr_decay_epoch             = conf.get('train:lr-decay-epoch')
-        self.lr_decay                   = conf.get('train:lr-decay')
+        self.epoch                      = conf('train:epoch')
+        self.batch_size                 = conf('train:batch-size')
+        self.clip_gradient_max_norm     = conf('train:clip-gradient-max-norm')
+        self.log_batch                  = conf('train:log-batch')
+        self.log_batch_interval         = conf('train:log-batch-interval', -1)
+        self.lr                         = conf('train:lr')
+        self.lr_decay_epoch             = conf('train:lr-decay-epoch')
+        self.lr_decay                   = conf('train:lr-decay')
 
-        self.ml_enable                  = conf.get('train:ml:enable', True)
-        self.ml_forcing_ratio           = conf.get('train:ml:forcing-ratio', 1)
-        self.ml_forcing_decay           = conf.get('train:ml:forcing-decay', 0)
+        self.ml_enable                  = conf('train:ml:enable', True)
+        self.ml_forcing_ratio           = conf('train:ml:forcing-ratio', 1)
+        self.ml_forcing_decay           = conf('train:ml:forcing-decay', 0)
 
-        self.rl_enable                  = conf.get('train:rl:enable')
-        self.rl_weight                  = conf.get('train:rl:weight')
-        self.rl_transit_epoch           = conf.get('train:rl:transit-epoch', -1)
-        self.rl_transit_decay           = conf.get('train:rl:transit-decay', 0)
+        self.rl_enable                  = conf('train:rl:enable')
+        self.rl_weight                  = conf('train:rl:weight')
+        self.rl_transit_epoch           = conf('train:rl:transit-epoch', -1)
+        self.rl_transit_decay           = conf('train:rl:transit-decay', 0)
 
-        self.tb_log_dir                 = conf.get('train:tb-log-dir')
+        self.tb_log_dir                 = conf('train:tb-log-dir')
 
-        self.save_model_per_epoch       = conf.get('train:save-model-per-epoch')
-        self.pointer_generator          = conf.get('pointer-generator')
+        self.save_model_per_epoch       = conf('train:save-model-per-epoch')
+        self.pointer_generator          = conf('pointer-generator')
 
 
-        self.vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
+        self.vocab = SimpleVocab(FileUtil.get_file_path(conf('vocab-file')), conf('vocab-size'))
 
         self.seq2seq = cuda(Seq2Seq(self.vocab))
 
         self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps, self.pointer_generator)
 
-        self.data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')), FileUtil.get_file_path(conf.get('train:summary-file')), self.batch_size)
+        self.data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf('train:article-file')), FileUtil.get_file_path(conf('train:summary-file')), self.batch_size)
 
         self.optimizer = t.optim.Adam(self.seq2seq.parameters(), lr=self.lr)
 
@@ -387,7 +387,7 @@ class Train(object):
         self.logger.debug('time\t=\t%s', str(datetime.timedelta(seconds=train_time)))
 
     def evaluate(self):
-        is_enable = conf.get('train:eval', False)
+        is_enable = conf('train:eval', False)
         if is_enable is False:
             return
 
@@ -449,7 +449,7 @@ class Train(object):
         self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=total_eval_time)))
 
     def load_model(self):
-        model_file = conf.get('train:load-model-file')
+        model_file = conf('train:load-model-file')
         if model_file is None:
             return
         model_file = FileUtil.get_file_path(model_file)
@@ -472,7 +472,7 @@ class Train(object):
             self.logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
 
     def save_model(self, args, save_epoch):
-        model_file = conf.get('train:save-model-file')
+        model_file = conf('train:save-model-file')
         if not model_file:
             return
 
@@ -498,7 +498,7 @@ class Train(object):
 
     def run(self):
         # display configuration
-        self.logger.debug('>>> configuration: \n' + conf.dump().strip())
+        self.logger.debug('>>> configuration: \n' + conf().dump().strip())
 
         # load pre-trained model
         self.load_model()
@@ -517,9 +517,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    config_file = args.conf_file
-    if config_file is not None:
-        conf.merge(config_file)
+    AppContext(args.conf_file)
 
     train = Train()
     train.run()

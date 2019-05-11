@@ -2,6 +2,7 @@ from unittest import TestCase
 
 from rouge import Rouge
 
+from test.common import *
 from main.seq2seq import Seq2Seq
 from main.common.simple_vocab import *
 from main.common.simple_vocab import SimpleVocab
@@ -22,14 +23,14 @@ class TestSeq2Seq(TestCase):
         return score
 
     def test(self):
-        data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf.get('train:article-file')),
-                                          FileUtil.get_file_path(conf.get('train:summary-file')), 2)
+        data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf('train:article-file')),
+                                          FileUtil.get_file_path(conf('train:summary-file')), 2)
 
-        vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
+        vocab = SimpleVocab(FileUtil.get_file_path(conf('vocab-file')), conf('vocab-size'))
 
         seq2seq = cuda(Seq2Seq(vocab))
 
-        checkpoint = t.load(FileUtil.get_file_path(conf.get('model-file')))
+        checkpoint = t.load(FileUtil.get_file_path(conf('model-file')))
 
         seq2seq.load_state_dict(checkpoint['model_state_dict'])
 

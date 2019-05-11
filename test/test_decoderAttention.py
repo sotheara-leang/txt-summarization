@@ -1,15 +1,14 @@
 from unittest import TestCase
 
-
-from main.common.common import *
+from test.common import *
 from main.decoder_attention import DecoderAttention
 
 
 class TestDecoderAttention(TestCase):
 
     def test(self):
-        dec_hidden = t.randn(2, 2 * conf.get('hidden-size'))
-        pre_dec_hidden = t.randn(2, 3, 2 * conf.get('hidden-size'))
+        dec_hidden = t.randn(2, 2 * conf('hidden-size'))
+        pre_dec_hidden = t.randn(2, 3, 2 * conf('hidden-size'))
 
         decoder_att = DecoderAttention()
 

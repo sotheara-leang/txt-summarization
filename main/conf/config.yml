@@ -17,6 +17,10 @@ share-dec-weight: true
 
 device: cpu
 
+logging:
+  enable: true
+  conf-file:
+
 train:
   epoch: 50
   batch-size: 20
@@ -40,7 +44,7 @@ train:
 
   eval: true
 
-  tb-log-dir: logs/giga/
+  tb-log-dir: ${PROJ_HOME}/logs/giga/
 
   article-file: data/train/giga-article.txt
   summary-file: data/train/giga-summary.txt

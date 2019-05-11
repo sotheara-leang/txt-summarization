@@ -1,13 +1,13 @@
 from unittest import TestCase
 
-from main.common.common import *
+from test.common import *
 from main.encoder import Encoder
 
 
 class TestEncoder(TestCase):
 
     def test(self):
-        x = t.randn(2, 3, conf.get('hidden-size'))
+        x = t.randn(2, 3, conf('hidden-size'))
         seq_len = t.FloatTensor([3, 3])
 
         print(x)
