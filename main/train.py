@@ -44,11 +44,15 @@ class Train(object):
         self.rl_transit_epoch           = conf('train:rl:transit-epoch', -1)
         self.rl_transit_decay           = conf('train:rl:transit-decay', 0)
 
-        self.tb_log_dir                 = conf('train:tb-log-dir')
-
         self.save_model_per_epoch       = conf('train:save-model-per-epoch')
         self.pointer_generator          = conf('pointer-generator')
 
+        # tensorboard
+        self.tb_writer = None
+        if conf('tb:enable'):
+            tb_log_dir = conf('train:tb-log-dir')
+            if tb_log_dir is not None:
+                self.tb_writer = SummaryWriter(FileUtil.get_file_path(tb_log_dir))
 
         self.vocab = SimpleVocab(FileUtil.get_file_path(conf('vocab-file')), conf('vocab-size'))
 
@@ -61,9 +65,6 @@ class Train(object):
         self.optimizer = t.optim.Adam(self.seq2seq.parameters(), lr=self.lr)
 
         self.criterion = nn.NLLLoss(reduction='none', ignore_index=TK_PADDING['id'])
-
-        if self.tb_log_dir is not None:
-            self.tb_writer = SummaryWriter(FileUtil.get_file_path(self.tb_log_dir))
 
     def train_batch(self, batch, epoch_counter):
         start_time = time.time()
@@ -307,7 +308,7 @@ class Train(object):
 
         return y, log_prob
 
-    def train(self):
+    def train(self, start_epoch):
         self.seq2seq.train()
 
         self.logger.debug('>>> training:')
@@ -317,7 +318,7 @@ class Train(object):
 
         criterion_scheduler = t.optim.lr_scheduler.StepLR(self.optimizer, self.lr_decay_epoch, self.lr_decay)
 
-        for i in range(self.epoch):
+        for i in range(start_epoch, self.epoch):
             self.logger.debug('========================= epoch %i/%i =========================', i + 1, self.epoch)
 
             batch_counter = 0
@@ -364,7 +365,7 @@ class Train(object):
             epoch_samples_award = total_samples_award / batch_counter
 
             # log to tensorboard
-            if self.tb_log_dir is not None:
+            if self.tb_writer is not None:
                 self.tb_writer.add_scalar('Epoch_Train/Loss', epoch_loss, i + 1)
                 self.tb_writer.add_scalar('Epoch_Train/ML-Loss', epoch_ml_loss, i + 1)
                 self.tb_writer.add_scalar('Epoch_Train/RL-Loss', epoch_rl_loss, i + 1)
@@ -449,9 +450,12 @@ class Train(object):
         self.logger.debug('time\t:\t%s', str(datetime.timedelta(seconds=total_eval_time)))
 
     def load_model(self):
+        epoch = 0
+
         model_file = conf('train:load-model-file')
         if model_file is None:
-            return
+            return epoch
+
         model_file = FileUtil.get_file_path(model_file)
 
         if os.path.isfile(model_file):
@@ -469,7 +473,10 @@ class Train(object):
             self.logger.debug('epoch: %s', str(epoch + 1))
             self.logger.debug('loss: %s', str(loss))
         else:
-            self.logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
+            self.logger.error('>>> error loading model - file not exist: %s', model_file)
+            raise Exception('>>> error loading model - file not exist: %s' % model_file)
+
+        return epoch
 
     def save_model(self, args, save_epoch):
         model_file = conf('train:save-model-file')
@@ -489,8 +496,11 @@ class Train(object):
 
         self.logger.debug('>>> save model into: ' + model_file)
 
+        self.logger.debug('epoch: %s', str(args['epoch'] + 1))
+        self.logger.debug('loss: %s', str(args['loss']))
+
         t.save({
-            'epoch': args['epoch'],
+            'epoch': args['epoch'] + 1,
             'loss': args['loss'],
             'model_state_dict': self.seq2seq.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
@@ -501,11 +511,11 @@ class Train(object):
         self.logger.debug('>>> configuration: \n' + conf().dump().strip())
 
         # load pre-trained model
-        self.load_model()
+        current_epoch = self.load_model()
 
         # train
         with autograd.detect_anomaly():
-            self.train()
+            self.train(current_epoch)
 
         # evaluate
         self.evaluate()

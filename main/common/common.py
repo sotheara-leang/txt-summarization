@@ -18,11 +18,10 @@ class AppContext(object):
         self.conf = Configuration(conf_file)
 
         if self.conf.get('logging:enable') is True:
-            log_dir = self.conf.get('logging:conf-file')
-            if log_dir is None:
-                log_dir = 'main/conf/logging.yml'
-
+            log_dir = self.conf.get('logging:conf-file', 'main/conf/logging.yml')
             Logger(log_dir)
+        else:
+            logging.basicConfig(level=logging.DEBUG)
 
         ctx['conf'] = self.conf
 

@@ -2,12 +2,12 @@ from unittest import TestCase
 
 from rouge import Rouge
 
-from test.common import *
 from main.seq2seq import Seq2Seq
 from main.common.simple_vocab import *
 from main.common.simple_vocab import SimpleVocab
 from main.common.util.file_util import FileUtil
 from main.data.giga_world import *
+from test.common import *
 
 
 class TestSeq2Seq(TestCase):
