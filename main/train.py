@@ -49,8 +49,8 @@ class Train(object):
 
         # tensorboard
         self.tb_writer = None
-        if conf('tb:enable'):
-            tb_log_dir = conf('train:tb-log-dir')
+        if conf('train:tb:enable') is True:
+            tb_log_dir = conf('train:tb:log-dir')
             if tb_log_dir is not None:
                 self.tb_writer = SummaryWriter(FileUtil.get_file_path(tb_log_dir))
 
