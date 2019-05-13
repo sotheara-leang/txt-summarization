@@ -473,7 +473,6 @@ class Train(object):
             self.logger.debug('epoch: %s', str(epoch + 1))
             self.logger.debug('loss: %s', str(loss))
         else:
-            self.logger.error('>>> error loading model - file not exist: %s', model_file)
             raise Exception('>>> error loading model - file not exist: %s' % model_file)
 
         return epoch
@@ -507,18 +506,22 @@ class Train(object):
         }, FileUtil.get_file_path(model_file))
 
     def run(self):
-        # display configuration
-        self.logger.debug('>>> configuration: \n' + conf().dump().strip())
+        try:
+            # display configuration
+            self.logger.debug('>>> configuration: \n' + conf().dump().strip())
 
-        # load pre-trained model
-        current_epoch = self.load_model()
+            # load pre-trained model
+            current_epoch = self.load_model()
 
-        # train
-        with autograd.detect_anomaly():
-            self.train(current_epoch)
+            # train
+            with autograd.detect_anomaly():
+                self.train(current_epoch)
 
-        # evaluate
-        self.evaluate()
+            # evaluate
+            self.evaluate()
+        except Exception as e:
+            self.logger.error(e, exc_info=True)
+            raise e
 
 
 if __name__ == "__main__":

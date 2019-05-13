@@ -113,17 +113,21 @@ class Evaluate(object):
 
             self.seq2seq.load_state_dict(checkpoint['model_state_dict'])
         else:
-            self.logger.warning('>>> cannot load pre-trained model - file not exist: %s', model_file)
+            raise Exception('>>> cannot load model - file not exist: %s', model_file)
 
     def run(self):
-        # display configuration
-        self.logger.debug('>>> configuration: \n' + conf.dump().strip())
+        try:
+            # display configuration
+            self.logger.debug('>>> configuration: \n' + conf.dump().strip())
 
-        # load pre-trained model`
-        self.load_model()
+            # load pre-trained model`
+            self.load_model()
 
-        # evaluate
-        self.evaluate()
+            # evaluate
+            self.evaluate()
+        except Exception as e:
+            self.logger.error(e, exc_info=True)
+            raise e
 
 
 if __name__ == "__main__":
