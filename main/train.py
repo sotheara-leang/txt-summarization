@@ -379,9 +379,9 @@ class Train(object):
             # reload data set
             self.data_loader.reset()
 
-            # save model per epoch
+            # save model
             if i == self.epoch - 1 or (self.save_model_per_epoch is not None and (i + 1) % self.save_model_per_epoch == 0):
-                self.save_model({'epoch': i, 'loss': epoch_loss}, i != self.epoch - 1)
+                self.save_model({'epoch': i, 'loss': epoch_loss})
 
         train_time = time.time() - train_time
 
@@ -470,14 +470,14 @@ class Train(object):
 
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-            self.logger.debug('epoch: %s', str(epoch + 1))
+            self.logger.debug('epoch: %s', str(epoch))
             self.logger.debug('loss: %s', str(loss))
         else:
             raise Exception('>>> error loading model - file not exist: %s' % model_file)
 
         return epoch
 
-    def save_model(self, args, save_epoch):
+    def save_model(self, param):
         model_file = conf('train:save-model-file')
         if not model_file:
             return
@@ -488,19 +488,20 @@ class Train(object):
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
 
-        if save_epoch is True:
-            dot = model_file.rfind('.')
-            if dot != -1:
-                model_file = model_file[:dot] + '-' + str(args['epoch'] + 1) + model_file[dot:]
+        dot = model_file.rfind('.')
+        if dot != -1:
+            model_file = model_file[:dot] + '-' + str(param['epoch'] + 1) + model_file[dot:]
+        else:
+            model_file = model_file + '-' + str(param['epoch'] + 1)
 
         self.logger.debug('>>> save model into: ' + model_file)
 
-        self.logger.debug('epoch: %s', str(args['epoch'] + 1))
-        self.logger.debug('loss: %s', str(args['loss']))
+        self.logger.debug('epoch: %s', str(param['epoch'] + 1))
+        self.logger.debug('loss: %s', str(param['loss']))
 
         t.save({
-            'epoch': args['epoch'] + 1,
-            'loss': args['loss'],
+            'epoch': param['epoch'] + 1,
+            'loss': param['loss'],
             'model_state_dict': self.seq2seq.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
         }, FileUtil.get_file_path(model_file))

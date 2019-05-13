@@ -1,5 +1,4 @@
 from rouge import Rouge
-from tensorboardX import SummaryWriter
 import os
 import time
 import datetime
@@ -24,10 +23,7 @@ class Evaluate(object):
         self.log_batch                  = conf('eval:log-batch')
         self.log_batch_interval         = conf('eval:log-batch-interval', -1)
 
-        self.tb_log_dir                 = conf('eval:tb-log-dir')
-
         self.pointer_generator          = conf('pointer-generator')
-
 
         self.vocab = SimpleVocab(FileUtil.get_file_path(conf('vocab-file')), conf('vocab-size'))
 
@@ -36,9 +32,6 @@ class Evaluate(object):
         self.batch_initializer = BatchInitializer(self.vocab, self.max_enc_steps, self.max_dec_steps, self.pointer_generator)
 
         self.data_loader = GigaWorldDataLoader(FileUtil.get_file_path(conf('eval:article-file')), FileUtil.get_file_path(conf('eval:summary-file')), self.batch_size)
-
-        if self.tb_log_dir is not None:
-            self.tb_writer = SummaryWriter(FileUtil.get_file_path(self.tb_log_dir))
 
     def evaluate(self):
         self.logger.debug('>>> evaluation:')
@@ -111,6 +104,12 @@ class Evaluate(object):
 
             checkpoint = t.load(model_file)
 
+            epoch = checkpoint['epoch']
+            loss = checkpoint['loss']
+
+            self.logger.debug('epoch: %s', str(epoch))
+            self.logger.debug('loss: %s', str(loss))
+
             self.seq2seq.load_state_dict(checkpoint['model_state_dict'])
         else:
             raise Exception('>>> cannot load model - file not exist: %s', model_file)
@@ -118,7 +117,7 @@ class Evaluate(object):
     def run(self):
         try:
             # display configuration
-            self.logger.debug('>>> configuration: \n' + conf.dump().strip())
+            self.logger.debug('>>> configuration: \n' + conf().dump().strip())
 
             # load pre-trained model`
             self.load_model()
