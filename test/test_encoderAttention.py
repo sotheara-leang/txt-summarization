@@ -1,15 +1,15 @@
 from unittest import TestCase
 
-from main.common.common import *
+from test.common import *
 from main.encoder_attention import EncoderAttention
 
 
 class TestEncoderAttention(TestCase):
 
     def test(self):
-        dec_hidden = t.randn(2, 2 * conf.get('hidden-size'))
+        dec_hidden = t.randn(2, 2 * conf('hidden-size'))
 
-        enc_hidden = t.randn(2, 3, 2 * conf.get('hidden-size'))
+        enc_hidden = t.randn(2, 3, 2 * conf('hidden-size'))
 
         mask = t.tensor([[1, 1, 1], [1, 1, 0]])
 

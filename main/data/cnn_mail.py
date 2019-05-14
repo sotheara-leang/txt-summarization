@@ -31,7 +31,7 @@ class CNNDataLoader(DataLoader):
 class CNNProcessedDataLoader(DataLoader):
 
     def __init__(self, data_path, batch_size, file_num=None):
-        self.logger = getLogger(self)
+        self.logger = logger(self)
 
         self.data_path = data_path
         self.file_num = file_num

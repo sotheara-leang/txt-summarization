@@ -1,5 +1,5 @@
-emb-size: 100
-emb-file: data/train/embedding
+emb-size: 50
+emb-file: data/train/embedding.bin
 
 enc-hidden-size: 100
 dec-hidden-size: 200
@@ -16,6 +16,10 @@ pointer-generator: true
 share-dec-weight: true
 
 device: cpu
+
+logging:
+  enable: true
+  conf-file:
 
 train:
   epoch: 50
@@ -40,7 +44,9 @@ train:
 
   eval: true
 
-  tb-log-dir: logs/giga/
+  tb:
+    enable: false
+    log-dir: ${PROJ_HOME}/logs/giga/
 
   article-file: data/train/giga-article.txt
   summary-file: data/train/giga-summary.txt

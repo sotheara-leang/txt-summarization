@@ -1,6 +1,7 @@
 from unittest import TestCase
 
-from main.common.common import *
+from test.common import *
+
 from main.common.util.file_util import FileUtil
 from main.data.giga_world import GigaWorldDataLoader
 
@@ -9,8 +10,8 @@ class TestDataLoader(TestCase):
 
     def test(self):
         dataloader = GigaWorldDataLoader(
-            FileUtil.get_file_path(conf.get('train:article-file')),
-            FileUtil.get_file_path(conf.get('train:summary-file')), 15)
+            FileUtil.get_file_path(conf('train:article-file')),
+            FileUtil.get_file_path(conf('train:summary-file')), 15)
 
         counter = 0
         while True:

@@ -8,7 +8,7 @@ class EncoderAttention(nn.Module):
     def __init__(self):
         super(EncoderAttention, self).__init__()
 
-        self.w_attn = nn.Linear(2 * conf.get('enc-hidden-size'), conf.get('dec-hidden-size'), False)
+        self.w_attn = nn.Linear(2 * conf('enc-hidden-size'), conf('dec-hidden-size'), False)
 
     '''
         :params

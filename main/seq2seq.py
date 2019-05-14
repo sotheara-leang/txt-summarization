@@ -15,13 +15,13 @@ class Seq2Seq(nn.Module):
     def __init__(self, vocab: Vocab, embedding=None):
         super(Seq2Seq, self).__init__()
 
-        self.emb_size           = conf.get('emb-size')
-        self.enc_hidden_size    = conf.get('enc-hidden-size')
-        self.dec_hidden_size    = conf.get('dec-hidden-size')
-        self.vocab_size         = conf.get('vocab-size')
-        self.max_dec_steps      = conf.get('max-dec-steps')
-        self.share_dec_weight   = conf.get('share-dec-weight')
-        self.pointer_generator  = conf.get('pointer-generator')
+        self.emb_size           = conf('emb-size')
+        self.enc_hidden_size    = conf('enc-hidden-size')
+        self.dec_hidden_size    = conf('dec-hidden-size')
+        self.vocab_size         = conf('vocab-size')
+        self.max_dec_steps      = conf('max-dec-steps')
+        self.share_dec_weight   = conf('share-dec-weight')
+        self.pointer_generator  = conf('pointer-generator')
 
         self.vocab = vocab
 
@@ -64,6 +64,7 @@ class Seq2Seq(nn.Module):
 
             :returns
                 y                : B, L
+                att              : B, L
     '''
 
     def forward(self, x, x_len, extend_vocab_x, max_oov_len):
@@ -96,6 +97,8 @@ class Seq2Seq(nn.Module):
 
         enc_ctx_vector = cuda(t.zeros(batch_size, 2 * self.enc_hidden_size))
 
+        enc_attention = None
+
         enc_temporal_score = None
 
         pre_dec_hiddens = None
@@ -104,7 +107,7 @@ class Seq2Seq(nn.Module):
 
         for i in range(self.max_dec_steps):
             # decoding
-            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, _ = self.decode(
+            vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_att, enc_temporal_score, _, _ = self.decode(
                 dec_input,
                 dec_hidden,
                 dec_cell,
@@ -116,9 +119,11 @@ class Seq2Seq(nn.Module):
                 extend_vocab_x,
                 max_oov_len)
 
+            enc_attention = enc_att.unsqueeze(1).detach() if enc_attention is None else t.cat([enc_attention, enc_att.unsqueeze(1).detach()], dim=1)
+
             ## output
 
-            _, dec_output = t.max(vocab_dist, dim=1)
+            dec_output = t.max(vocab_dist, dim=1)[1].detach()
 
             y = dec_output.unsqueeze(1) if y is None else t.cat([y, dec_output.unsqueeze(1)], dim=1)
 
@@ -133,7 +138,7 @@ class Seq2Seq(nn.Module):
 
             dec_input = dec_output
 
-        return y
+        return y, enc_attention
 
     '''
         :params
@@ -153,8 +158,10 @@ class Seq2Seq(nn.Module):
             dec_hidden              :   B, DH
             dec_cell                :   B, DH
             enc_ctx_vector          :   B, 2EH
+            enc_attention           :   B, L
             enc_temporal_score      :   B, L
             dec_ctx_vector          :   B, DH
+            dec_attention           :   B, L
     '''
 
     def decode(self, dec_input,
@@ -178,7 +185,7 @@ class Seq2Seq(nn.Module):
 
         # intra-decoder attention
 
-        dec_ctx_vector, _ = self.dec_att(dec_hidden, pre_dec_hiddens)
+        dec_ctx_vector, dec_att = self.dec_att(dec_hidden, pre_dec_hiddens)
 
         # vocab distribution
 
@@ -201,16 +208,17 @@ class Seq2Seq(nn.Module):
         else:
             final_vocab_dist = vocab_dist
 
-        return final_vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_temporal_score, dec_ctx_vector
+        return final_vocab_dist, dec_hidden, dec_cell, enc_ctx_vector, enc_att, enc_temporal_score, dec_ctx_vector, dec_att
 
     '''
         :params
             x       : article
         :returns
             y       : summary
+            att     : attention
     '''
 
-    def summarize(self, x):
+    def evaluate(self, x):
         self.eval()
 
         words = x.split()
@@ -225,6 +233,6 @@ class Seq2Seq(nn.Module):
 
         max_oov_len = len(oov)
 
-        y = self.forward(x, x_len, extend_vocab_x, max_oov_len)[0]
+        y, att = self.forward(x, x_len, extend_vocab_x, max_oov_len)
 
-        return ' '.join(self.vocab.ids2words(y.tolist(), oov))
+        return ' '.join(self.vocab.ids2words(y[0].tolist(), oov)), att[0]

@@ -1,14 +1,14 @@
 from unittest import TestCase
 
 from main.common.util.file_util import FileUtil
-from main.common.common import *
+from test.common import *
 from main.common.simple_vocab import SimpleVocab
 
 
 class TestVocab(TestCase):
 
     def test(self):
-        vocab = SimpleVocab(FileUtil.get_file_path(conf.get('vocab-file')), conf.get('vocab-size'))
+        vocab = SimpleVocab(FileUtil.get_file_path(conf('vocab-file')), conf('vocab-size'))
 
         print(vocab.word2id('australia'))
 
