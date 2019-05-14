@@ -1,5 +1,5 @@
-emb-size: 100
-emb-file: data/train/embedding
+emb-size: 50
+emb-file: data/train/embedding.bin
 
 enc-hidden-size: 100
 dec-hidden-size: 200
