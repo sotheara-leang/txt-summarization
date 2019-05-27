@@ -95,6 +95,7 @@ class Seq2Seq(nn.Module):
         # stop decoding mask
         stop_dec_mask = cuda(t.zeros(batch_size))
 
+        # initial encoder context vector
         enc_ctx_vector = cuda(t.zeros(batch_size, 2 * self.enc_hidden_size))
 
         enc_attention = None

@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import numpy as np
+import os
 
 
 def count(file_in):
@@ -36,6 +37,9 @@ def generate_embedding(file_in, dir_out, fname):
 
 def generate_vocab(file_in, dir_out, fname):
     output_fname = 'vocab.txt' if fname is None else fname
+
+    if not os.path.exists(dir_out):
+        os.makedirs(dir_out)
 
     with open(file_in, 'r') as r, open(dir_out + '/' + output_fname, 'w') as w:
         words = []

@@ -2,8 +2,6 @@ import argparse
 import os
 import collections
 import tqdm
-import string
-import re
 
 ptb_unescape = {'<t>': '', '</t>': ''}
 
@@ -119,7 +117,7 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
     output_fname = 'vocab.txt' if fname is None else fname
 
     with open(dir_out + '/' + output_fname, 'w', encoding='utf-8') as writer:
-        vocab_counter = sorted(vocab_counter.items(), key=lambda e: e[1], reverse=False)
+        vocab_counter = sorted(vocab_counter.items(), key=lambda e: e[1], reverse=True)
 
         for i, element in enumerate(vocab_counter):
             if max_vocab > 0 and i >= max_vocab:
@@ -132,11 +130,7 @@ def generate_vocab(files_in, dir_out, fname, max_vocab):
 
 
 def valid_token(token):
-    return token in string.punctuation or \
-           (token != ''
-            and token != '<t>'
-            and token not in ptb_unescape.keys()
-            and re.match('^[a-z]+|[a-z]+(-[a-z]+)+|\'[a-z]+$', token))
+    return token != '' and token not in ptb_unescape.keys()
 
 
 if __name__ == '__main__':
