@@ -1,5 +1,5 @@
-emb-size: 50
-emb-file: data/train/embedding.bin
+emb-size: 100
+emb-file:
 
 enc-hidden-size: 100
 dec-hidden-size: 200
@@ -25,7 +25,7 @@ train:
   epoch: 50
   batch-size: 20
   log-batch: true
-  log-batch-interval: 10
+  log-batch-interval: 1
   clip-gradient-max-norm: 1
 
   lr: 0.001
@@ -45,8 +45,8 @@ train:
   eval: true
 
   tb:
-    enable: false
-    log-dir: ${PROJ_HOME}/logs/giga/
+    enable: true
+    log-dir: ${PROJ_HOME}/log/tb/
 
   article-file: data/train/giga-article.txt
   summary-file: data/train/giga-summary.txt
