@@ -44,7 +44,7 @@ ptyprocess==0.6.0
 Pygments==2.3.1
 pyrsistent==0.14.11
 python-dateutil==2.8.0
-PyYAML==5.1
+PyYAML==5.4
 pyzmq==18.0.1
 rouge==0.3.2
 Send2Trash==1.5.0
